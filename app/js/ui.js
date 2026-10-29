@@ -30,7 +30,7 @@ export function sheet({ title, text, body = [], actions = [] }) {
     title && h('h3', { class: 'sheet-title' }, title),
     text && h('p', { class: 'sheet-text' }, text),
     ...body,
-    buttons.length && h('div', { class: 'sheet-actions' }, buttons));
+    buttons.length > 0 && h('div', { class: 'sheet-actions' }, buttons));
   const backdrop = h('div', { class: 'backdrop', onclick: (e) => { if (e.target === backdrop) close(); } }, panel);
   document.body.append(backdrop);
   requestAnimationFrame(() => backdrop.classList.add('open'));

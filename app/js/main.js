@@ -22,6 +22,7 @@ async function route() {
   const { name, params } = parse();
   const factory = screens.get(name) || screens.get('library');
   if (current) await current.unmount();
+  document.querySelectorAll('.backdrop').forEach((b) => b.remove());
   const root = document.getElementById('app');
   root.replaceChildren();
   current = factory ? factory() : null;
@@ -36,6 +37,8 @@ async function start() {
   await cleanupIncomplete();
   const { libraryScreen } = await import('./library.js');
   registerScreen('library', libraryScreen);
+  const { readerScreen } = await import('./reader.js');
+  registerScreen('read', readerScreen);
   window.addEventListener('hashchange', route);
   await route();
 }
