@@ -161,7 +161,16 @@ export function attachPlayer(api) {
     noAudio.hidden = Boolean(file) || !meta.audio;
     if (!file) { player.unload(); el.toReader.hidden = true; return; }
     if (ctx.loadedChapter !== meta.id) {
-      await player.load(file);
+      try {
+        await player.load(file);
+      } catch {
+        ctx.hasAudio = false;
+        transport.hidden = true;
+        rateBtn.hidden = true;
+        el.modeSlot.hidden = true;
+        noAudio.hidden = false;
+        return;
+      }
       ctx.loadedChapter = meta.id;
       player.rate = ctx.settings.rate;
       // начало звука — первое предложение открытой страницы
@@ -169,9 +178,43 @@ export function attachPlayer(api) {
     }
     ctx.follow = true;
     onTick(player.ms);
+    setMediaMeta(meta);
     if (wasPlaying) await player.play();
     api.emit('audio-ready');
   });
+
+  // ---------- экран блокировки и наушники ----------
+  let coverUrl = null;
+  function setMediaMeta(meta) {
+    if (!('mediaSession' in navigator)) return;
+    if (!coverUrl && st.book.cover) coverUrl = URL.createObjectURL(st.book.cover);
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: meta.title,
+      artist: st.book.author,
+      album: st.book.title,
+      artwork: coverUrl ? [{ src: coverUrl, sizes: '600x900', type: 'image/jpeg' }] : [],
+    });
+  }
+
+  function setHandlers() {
+    if (!('mediaSession' in navigator)) return;
+    const ms = navigator.mediaSession;
+    const handlers = {
+      play: () => toggle(),
+      pause: () => player.pause(),
+      seekbackward: () => skip(-15000),
+      seekforward: () => skip(15000),
+      previoustrack: () => { if (st.index > 0) { ctx.loadedChapter = null; ctx.autoplayNext = player.playing; api.openChapter(st.index - 1); } },
+      nexttrack: () => {
+        const next = nextAudioChapter(st.book.chapters, st.index);
+        if (next >= 0) { ctx.loadedChapter = null; ctx.autoplayNext = player.playing; api.openChapter(next); }
+      },
+    };
+    for (const [action, fn] of Object.entries(handlers)) {
+      try { ms.setActionHandler(action, fn); } catch { /* действие не поддерживается */ }
+    }
+  }
+  setHandlers();
 
   player.addEventListener('ended', async () => {
     if (api.repeatActive) return;
@@ -232,6 +275,13 @@ export function attachPlayer(api) {
 
   api.on('unmount', () => {
     player.unload();
+    if (coverUrl) URL.revokeObjectURL(coverUrl);
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = null;
+      for (const a of ['play', 'pause', 'seekbackward', 'seekforward', 'previoustrack', 'nexttrack']) {
+        try { navigator.mediaSession.setActionHandler(a, null); } catch { /* нет */ }
+      }
+    }
   });
 
   return ctx;

@@ -1,5 +1,5 @@
 // Service Worker: офлайн-кэш оболочки приложения. Увеличивайте APP_VERSION при каждом изменении файлов app/.
-const APP_VERSION = 9;
+const APP_VERSION = 10;
 const CACHE = `syncbook-v${APP_VERSION}`;
 const SHELL = [
   './',
