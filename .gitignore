@@ -1,0 +1,9 @@
+# Исходники книг и всё, что из них получено, никогда не публикуются
+books/
+work/
+output/
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
