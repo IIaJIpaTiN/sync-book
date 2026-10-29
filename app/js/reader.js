@@ -237,6 +237,7 @@ export function readerScreen() {
       if (p) index = Math.max(0, st.book.chapters.findIndex((c) => c.id === p.chapterId));
       st.lang = (p && p.lang) || 'en';
       api.initialProgress = p || null;
+      if (window.__syncbook) window.__syncbook.reader = api; // отладка на localhost
       for (const plugin of readerPlugins) await plugin(api);
       await openChapter(index, p ? { sentenceId: p.sentenceId ?? null, rsId: p.rsId ?? null } : {});
       api.emit('ready', { progress: p });
