@@ -1,0 +1,10 @@
+# torch ставится отдельно: pip install torch --index-url https://download.pytorch.org/whl/cu124
+faster-whisper>=1.1
+sentence-transformers>=3.0
+spacy>=3.7,<3.9
+lxml
+rapidfuzz
+num2words
+numpy
+tomli-w
+pytest
