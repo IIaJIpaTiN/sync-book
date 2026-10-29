@@ -32,3 +32,14 @@ def test_back_matter(tmp_path):
     p = make_epub(tmp_path, {"c.xhtml": "<p>A</p>", "z.xhtml": "<p>Bio</p>"},
                   toc=[("1 One", "c.xhtml"), ("About the Author", "z.xhtml")])
     assert [c.kind for c in read_epub(p).chapters] == ["chapter", "back"]
+
+
+def test_wordless_toc_entries_are_not_chapters(tmp_path):
+    p = make_epub(tmp_path, {"m.xhtml": "<p>*</p>", "c.xhtml": "<p>Real text.</p>", "z.xhtml": "<div><p>  </p></div>"},
+                  toc=[("Map", "m.xhtml"), ("1 One", "c.xhtml"), ("Plate", "z.xhtml")])
+    assert [(c.kind, c.title) for c in read_epub(p).chapters] == [("front", "Map"), ("chapter", "One")]
+
+
+def test_soft_hyphen_removed(tmp_path):
+    p = make_epub(tmp_path, {"c.xhtml": "<p>won­der​ful</p>"}, toc=[("C", "c.xhtml")])
+    assert read_epub(p).chapters[0].blocks[0].text == "wonderful"

@@ -23,6 +23,7 @@ class BookConfig:
     ru_epub: str
     audio: list[str]
     ru_chapter_map: dict[int, list[int]] | None = None
+    chapter_kinds: dict[int, str] | None = None  # ручная правка вида EN-глав: индекс → chapter/front/back
 
 
 def slug(title: str) -> str:
@@ -60,4 +61,15 @@ def load_or_create(book_dir: Path) -> BookConfig:
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     cmap = data.get("ru_chapter_map")
     data["ru_chapter_map"] = {int(k): list(v) for k, v in cmap.items()} if cmap else None
+    kinds = data.get("chapter_kinds")
+    data["chapter_kinds"] = {int(k): str(v) for k, v in kinds.items()} if kinds else None
     return BookConfig(**data)
+
+
+def save_chapter_map(book_dir: Path, cmap: dict[int, list[int]]) -> None:
+    """Дописывает автоматически найденное соответствие глав в book.toml для ручной правки."""
+    path = book_dir / "book.toml"
+    lines = ["", "# EN-глава (индекс среди обычных глав) = [RU-главы]; определено автоматически", "[ru_chapter_map]"]
+    lines += [f"{k} = {list(v)}" for k, v in sorted(cmap.items())]
+    text = path.read_text(encoding="utf-8").rstrip("\n")
+    path.write_text(text + "\n" + "\n".join(lines) + "\n", encoding="utf-8")

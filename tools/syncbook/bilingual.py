@@ -35,10 +35,24 @@ def default_chapter_map(en: list[EpubChapter], ru: list[EpubChapter]) -> dict[in
     return {k: [k] for k in range(ne)}
 
 
-def chapter_similarity(en_texts: list[str], ru_texts: list[str], emb: Embedder) -> list[float]:
-    """Косинус эмбеддингов начала каждой пары глав (тексты — первые абзацы)."""
-    a, b = emb.encode(en_texts), emb.encode(ru_texts)
-    return [float(x @ y) for x, y in zip(a, b)]
+MAP_THRESHOLD = 0.45
+
+
+def chapter_match(en_open: list[np.ndarray], ru_pars: list[np.ndarray], cmap: dict[int, list[int]]) -> dict[int, float]:
+    """Для каждой EN-главы — наибольшее сходство её первых абзацев с абзацами сопоставленных RU-глав.
+
+    Максимум по абзацам, а не начало к началу: так находятся EN-главы, слитые в переводе в одну,
+    и главы, у которых в переводе пропущен эпиграф.
+    """
+    out = {}
+    for k, rs in cmap.items():
+        pars = [ru_pars[r] for r in rs if len(ru_pars[r])]
+        out[k] = float(max((p @ en_open[k].T).max() for p in pars)) if pars and len(en_open[k]) else 0.0
+    return out
+
+
+def suspicious(sims: dict[int, float], threshold: float = MAP_THRESHOLD) -> list[int]:
+    return sorted(k for k, s in sims.items() if s < threshold)
 
 
 def _groups(v: np.ndarray, k: int) -> np.ndarray:

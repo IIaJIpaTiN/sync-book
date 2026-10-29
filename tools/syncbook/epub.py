@@ -23,6 +23,7 @@ ITALIC_TAGS = {"i", "em"}
 SKIP_TAGS = {"head", "script", "style", "img", "svg", "image"}
 BACK_RE = re.compile(r"about the author|also by|copyright|acknowledg|об авторе|содержание", re.I)
 _PARSER = etree.XMLParser(recover=True, resolve_entities=False)
+INVISIBLE = {"­", "​", "‌", "‍", "﻿"}  # мягкие переносы и нулевые пробелы рвут слова
 
 
 @dataclass
@@ -62,6 +63,8 @@ def _finish(buf: list[tuple[str, bool]]) -> tuple[str, list[tuple[int, int]]]:
     chars: list[tuple[str, bool]] = []
     for s, ital in buf:
         for ch in s:
+            if ch in INVISIBLE:
+                continue
             if ch.isspace():
                 if chars and chars[-1][0] != " ":
                     chars.append((" ", ital))
@@ -188,7 +191,14 @@ def read_epub(path: Path) -> EpubBook:
             chapters[-1].src.append(src)
         else:
             chapters.append(EpubChapter("", "front", blocks, [src]))
-    chapters = [c for c in chapters if c.blocks or c.kind == "chapter"]
+    # записи оглавления без слов (карта, иллюстрация, обложка) — не главы для чтения и аудио
+    seen_text = False
+    for c in chapters:
+        has_words = any(WORD_RE.search(b.text) for b in c.blocks)
+        if c.kind == "chapter" and not has_words:
+            c.kind = "back" if seen_text else "front"
+        seen_text = seen_text or (has_words and c.kind == "chapter")
+    chapters = [c for c in chapters if c.blocks]
 
     cover = None
     cover_id = next((m.get("content") for m in opf.iterfind(".//opf:meta", NS) if m.get("name") == "cover"), None)

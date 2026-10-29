@@ -27,6 +27,7 @@ from .tools import ffbin
 ROOT = Path(__file__).resolve().parents[2]
 WARN_MATCH = 0.90
 WARN_RUN = 40
+WARN_RU_QUALITY = 0.6
 
 
 @dataclass
@@ -102,13 +103,23 @@ def st_extract(ctx: Ctx) -> None:
         return {"kind": b.kind, "text": b.text, "italic": b.italic,
                 "sents": [] if b.kind == "sep" else [list(s) for s in split_ru(b.text, nlp_ru)]}
 
+    for i, kind in (ctx.cfg.chapter_kinds or {}).items():
+        if 0 <= i < len(en_book.chapters):
+            en_book.chapters[i].kind = kind
     if en_book.cover:
         raw = ctx.p("cover.src")
         raw.write_bytes(en_book.cover)
         subprocess.run([ffbin("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", "-i", str(raw),
                         "-vf", "scale=-2:min(900\\,ih)", "-q:v", "3", str(ctx.p("cover.jpg"))], check=True)
+    en_chapters = []
+    for c in en_book.chapters:
+        blocks = [en_block(b) for b in c.blocks]
+        kind = c.kind
+        if kind == "chapter" and not any(b["sents"] for b in blocks):
+            kind = "back" if en_chapters else "front"  # без слов нечего читать и синхронизировать
+        en_chapters.append({"title": c.title, "kind": kind, "blocks": blocks})
     ctx.save("01_extract.json", {
-        "en": [{"title": c.title, "kind": c.kind, "blocks": [en_block(b) for b in c.blocks]} for c in en_book.chapters],
+        "en": en_chapters,
         "ru": [{"title": c.title, "kind": c.kind, "blocks": [ru_block(b) for b in c.blocks]} for c in ru_book.chapters],
     })
 
@@ -216,17 +227,37 @@ def st_encode(ctx: Ctx) -> None:
 
 
 def st_bilingual(ctx: Ctx) -> None:
-    from .bilingual import Embedder, align_sentences, default_chapter_map, group_quality, split_shared
+    from .bilingual import (ChapterMapError, Embedder, align_sentences, chapter_match, default_chapter_map,
+                            group_quality, split_shared, suspicious)
+    from .config import save_chapter_map
 
     ex = ctx.load("01_extract.json")
     en = [c for c in ex["en"] if c["kind"] == "chapter"]
     ru = [c for c in ex["ru"] if c["kind"] == "chapter"]
+    manual = ctx.cfg.ru_chapter_map is not None
     cmap = ctx.cfg.ru_chapter_map or default_chapter_map(
         [SimpleNamespace(kind="chapter")] * len(en), [SimpleNamespace(kind="chapter")] * len(ru))
+    bad_idx = [k for k, rs in cmap.items() if not 0 <= k < len(en) or any(not 0 <= r < len(ru) for r in rs)]
+    if bad_idx:
+        raise ChapterMapError(f"ru_chapter_map в book.toml ссылается на несуществующие главы: {bad_idx} "
+                              f"(EN: {len(en)} глав, RU: {len(ru)} глав, нумерация с 0)")
+    emb = Embedder()
+
+    def opening(c: dict) -> list[str]:
+        return [b["text"][:600] for b in c["blocks"] if b["kind"] == "p" and b["sents"]][:3] or [c["title"]]
+
+    sims = chapter_match([emb.encode(opening(c)) for c in en],
+                         [emb.encode([b["text"][:600] for b in c["blocks"] if b["kind"] == "p"]) for c in ru], cmap)
+    bad = suspicious(sims)
+    if bad and not manual:
+        names = ", ".join(f"{k} «{en[k]['title']}»" for k in bad)
+        raise ChapterMapError(f"Начала EN-глав {names} не найдены в сопоставленных RU-главах — проверьте "
+                              "соответствие и задайте ru_chapter_map в book.toml")
+    if not manual:
+        save_chapter_map(ctx.book_dir, cmap)
     shared: dict[tuple, list[int]] = {}
     for k in sorted(cmap):
         shared.setdefault(tuple(cmap[k]), []).append(k)
-    emb = Embedder()
     out = {}
     for ru_ids, ks in shared.items():
         en_texts, counts = [], []
@@ -245,7 +276,8 @@ def st_bilingual(ctx: Ctx) -> None:
         q = group_quality(groups, ev, rv)
         parts = split_shared(groups, counts, ru_block) if len(ks) > 1 else [(groups, (0, len(ru_blocks)), 0)]
         for k, (g, (b0, b1), _) in zip(ks, parts):
-            out[str(k)] = {"ru": list(ru_ids), "blocks": [b0, b1], "groups": g, "quality": q}
+            out[str(k)] = {"ru": list(ru_ids), "blocks": [b0, b1], "groups": g, "quality": q,
+                           "map_sim": sims[k], "map_suspicious": k in bad}
     ctx.save("07_bilingual.json", out)
 
 
@@ -304,7 +336,12 @@ def st_pack(ctx: Ctx) -> None:
                 files.append((meta["ru"], _json(chapter_ru(
                     [Block(b["kind"], b["text"]) for b in rb], [[tuple(s) for s in b["sents"]] for b in rb],
                     [(g[0], g[1]) for g in b2["groups"]]))))
-            warn = a["match"] < WARN_MATCH or a["run"] > WARN_RUN
+            warn = (a["match"] < WARN_MATCH or a["run"] > WARN_RUN
+                    or (b2 is not None and (b2["quality"] < WARN_RU_QUALITY or b2.get("map_suspicious"))))
+            if b2 and b2.get("map_suspicious"):
+                warnings.append({"chapter": c["title"], "ms": 0,
+                                 "context": f"начало главы не найдено в русской главе (сходство {b2['map_sim']:.2f}) — "
+                                            "проверьте ru_chapter_map в book.toml"})
             rep_chapters.append({"title": c["title"], "match": a["match"], "run": a["run"],
                                  "ru_quality": b2["quality"] if b2 else None, "duration_ms": durations[n],
                                  "warn": warn})

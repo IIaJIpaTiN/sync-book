@@ -57,3 +57,28 @@ def test_split_shared_paragraph_straddles():
     # оба RU-предложения в одном абзаце: абзац целиком уходит второй главе
     parts = split_shared([([0], [0]), ([1], [1])], [1, 1], [0, 0])
     assert parts == [([([0], [])], (0, 0), 0), ([([0], [1])], (0, 1), 0)]
+
+
+def test_chapter_match_finds_start_inside_merged_ru_chapter():
+    from syncbook.bilingual import chapter_match
+
+    en_open = [E[[0]], E[[3]]]                # начала двух EN-глав
+    ru_pars = [np.stack([E[0], E[1], E[3], E[4]])]  # одна RU-глава содержит обе
+    sims = chapter_match(en_open, ru_pars, {0: [0], 1: [0]})
+    assert sims == {0: pytest.approx(1.0), 1: pytest.approx(1.0)}
+
+
+def test_chapter_match_flags_shifted_map():
+    from syncbook.bilingual import chapter_match, suspicious
+
+    en_open = [E[[0]], E[[2]]]
+    ru_pars = [np.stack([E[5], E[6]]), np.stack([E[0], E[1]])]
+    sims = chapter_match(en_open, ru_pars, {0: [0], 1: [1]})
+    assert suspicious(sims) == [0, 1]
+
+
+def test_chapter_match_tolerates_untranslated_epigraph():
+    from syncbook.bilingual import chapter_match
+
+    en_open = [np.stack([E[7], E[1]])]  # эпиграф E7 в переводе отсутствует, первый абзац текста — E1
+    assert chapter_match(en_open, [np.stack([E[1], E[2]])], {0: [0]}) == {0: pytest.approx(1.0)}

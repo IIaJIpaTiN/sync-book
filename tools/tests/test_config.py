@@ -36,3 +36,20 @@ def test_narrator_from_tags(tmp_path, monkeypatch):
     d = _book_dir(tmp_path, monkeypatch, tags={"composer": "Jane Reader"})
     (d / "x (Paul Boehmer).m4b").rename(d / "book.m4b")
     assert load_or_create(d).narrator == "Jane Reader"
+
+
+def test_chapter_kinds_override(tmp_path, monkeypatch):
+    d = _book_dir(tmp_path, monkeypatch)
+    load_or_create(d)
+    (d / "book.toml").write_text((d / "book.toml").read_text(encoding="utf-8")
+                                 + '\n[chapter_kinds]\n3 = "back"\n', encoding="utf-8")
+    assert load_or_create(d).chapter_kinds == {3: "back"}
+
+
+def test_save_chapter_map(tmp_path, monkeypatch):
+    from syncbook.config import save_chapter_map
+
+    d = _book_dir(tmp_path, monkeypatch)
+    load_or_create(d)
+    save_chapter_map(d, {0: [0], 1: [1, 2]})
+    assert load_or_create(d).ru_chapter_map == {0: [0], 1: [1, 2]}
