@@ -48,3 +48,8 @@ def make_epub(tmp_path, files: dict, toc: list, lang: str = "en", title: str = "
         for name, body in files.items():
             z.writestr(f"OPS/{name}", _xhtml(body))
     return path
+
+
+def words(n: int) -> list[str]:
+    """Детерминированные псевдослова без повторяющихся n-грамм."""
+    return [f"w{i}" for i in range(n)]
