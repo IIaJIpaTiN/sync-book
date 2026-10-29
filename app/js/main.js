@@ -32,15 +32,12 @@ async function start() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW:', err));
   }
+  const { cleanupIncomplete } = await import('./importer.js');
+  await cleanupIncomplete();
+  const { libraryScreen } = await import('./library.js');
+  registerScreen('library', libraryScreen);
   window.addEventListener('hashchange', route);
   await route();
 }
-
-registerScreen('library', () => ({
-  mount(root) {
-    root.textContent = '';
-  },
-  unmount() {},
-}));
 
 start();
