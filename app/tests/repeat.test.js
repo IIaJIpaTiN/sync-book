@@ -135,17 +135,68 @@ test('player: seek completes before play', async () => {
   audio.paused = true;
 });
 
-test('player: unlock plays muted once and restores state', async () => {
-  const log = [];
-  const audio = {
-    paused: true, muted: false, currentTime: 12.5,
-    addEventListener() {}, removeEventListener() {},
-    play() { log.push(`play muted=${this.muted}`); this.paused = false; this.currentTime = 12.6; return Promise.resolve(); },
-    pause() { log.push('pause'); this.paused = true; },
+// <audio>, который, как настоящий, отправляет play/pause/seeked отдельной задачей
+function asyncAudio() {
+  const listeners = {};
+  const fire = (n) => setTimeout(() => (listeners[n] || []).slice().forEach((f) => f()), 0);
+  return {
+    paused: true, playbackRate: 1, duration: 10, _t: 0, log: [],
+    get currentTime() { return this._t; },
+    set currentTime(v) { this._t = v; fire('seeked'); },
+    addEventListener(n, f, o) {
+      const w = o && o.once ? () => { listeners[n] = listeners[n].filter((x) => x !== w); f(); } : f;
+      (listeners[n] = listeners[n] || []).push(w);
+    },
+    removeEventListener(n, f) { listeners[n] = (listeners[n] || []).filter((x) => x !== f); },
+    play() { this.log.push('play'); if (this.paused) { this.paused = false; fire('play'); } return Promise.resolve(); },
+    pause() { this.log.push('pause'); if (!this.paused) { this.paused = true; fire('pause'); } },
   };
+}
+const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
+const state = (promise) => Promise.race([promise, settle(40).then(() => 'pending')]);
+
+test('player: explicit pause does not cancel the range started right after it', async () => {
+  const audio = asyncAudio();
   const p = new Player(audio);
-  await p.unlock();
-  await p.unlock();
-  assertEqual(log, ['play muted=true', 'pause']);
-  assertEqual([audio.muted, audio.currentTime, audio.paused], [false, 12.5, true]);
+  const r1 = p.playRange(0, 1000);
+  await settle();
+  p.pause();
+  const r2 = p.playRange(2000, 3000);
+  assertEqual(await r1, 'interrupted');
+  assertEqual(await state(r2), 'pending');
+  p.pause();
+});
+
+test('player: range end does not cancel the next range (repeats)', async () => {
+  const audio = asyncAudio();
+  const p = new Player(audio);
+  let r2 = null;
+  const r1 = p.playRange(0, 1000).then((res) => { r2 = p.playRange(0, 1000); return res; });
+  await settle();
+  p.endRange();
+  assertEqual(await r1, 'done');
+  assertEqual(await state(r2), 'pending');
+  p.pause();
+});
+
+test('player: external pause interrupts the range', async () => {
+  const audio = asyncAudio();
+  const p = new Player(audio);
+  const r1 = p.playRange(0, 1000);
+  await settle();
+  audio.pause();
+  assertEqual(await state(r1), 'interrupted');
+});
+
+test('player: unlock is synchronous and harmless to a range started in the same gesture', async () => {
+  const audio = asyncAudio();
+  audio.src = 'blob:x';
+  const p = new Player(audio);
+  p.unlock();
+  assertEqual(audio.log, ['play', 'pause']);
+  const r = p.playRange(2000, 3000);
+  p.unlock();
+  assertEqual(audio.log.length, 2, 'unlock runs once');
+  assertEqual(await state(r), 'pending');
+  p.pause();
 });

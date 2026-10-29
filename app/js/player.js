@@ -1,5 +1,9 @@
 // Обёртка над <audio>: точный опрос времени через requestAnimationFrame, воспроизведение отрезка
 // (playRange) с остановкой на его конце, ожидание seeked перед play.
+//
+// События play/pause приходят отдельной задачей, уже после того как код продолжил работу.
+// Поэтому свои паузы помечаются (selfPause): их событие не должно прерывать отрезок, запущенный
+// сразу после. Пауза без пометки — внешняя (система, наушники, экран блокировки) и прерывает отрезок.
 
 export class Player extends EventTarget {
   constructor(audio = new Audio()) {
@@ -9,11 +13,16 @@ export class Player extends EventTarget {
     this.url = null;
     this.raf = 0;
     this.range = null; // { end, resolve }
-    this.audio.addEventListener('play', () => { if (this.silent) return; this.emit('playstate'); this.loop(); });
-    this.audio.addEventListener('pause', () => {
-      if (this.silent) return;
+    this.selfPause = false;
+    this.unlocked = false;
+    this.audio.addEventListener('play', () => {
       this.emit('playstate');
-      if (this.range && !this.range.finishing) this.finishRange('interrupted');
+      if (!this.audio.paused) this.loop();
+    });
+    this.audio.addEventListener('pause', () => {
+      this.emit('playstate');
+      if (this.selfPause) { this.selfPause = false; return; }
+      this.finishRange('interrupted');
     });
     this.audio.addEventListener('ended', () => {
       if (this.range) this.finishRange('done');
@@ -26,8 +35,7 @@ export class Player extends EventTarget {
   }
 
   async load(file, ms = 0) {
-    this.finishRange('interrupted');
-    this.audio.pause();
+    this.pause();
     if (this.url) URL.revokeObjectURL(this.url);
     this.url = URL.createObjectURL(file);
     this.audio.src = this.url;
@@ -45,8 +53,7 @@ export class Player extends EventTarget {
   }
 
   unload() {
-    this.finishRange('interrupted');
-    this.audio.pause();
+    this.pause();
     this.audio.removeAttribute('src');
     this.audio.load();
     if (this.url) URL.revokeObjectURL(this.url);
@@ -70,28 +77,27 @@ export class Player extends EventTarget {
     await this.audio.play();
   }
 
-  // iOS разрешает play() только из жеста пользователя. Первый жест «разблокирует» элемент
-  // беззвучным запуском, чтобы последующие play() после await (seek, паузы «Повтора») работали.
-  async unlock() {
-    if (this.unlocked || !this.audio.paused) { this.unlocked = true; return; }
-    this.unlocked = true;
-    const { currentTime, muted } = this.audio;
-    this.audio.muted = true;
-    this.silent = true;
-    try {
-      await this.audio.play();
-      this.audio.pause();
-    } catch {
-      this.unlocked = false;
-    } finally {
-      this.audio.currentTime = currentTime;
-      this.audio.muted = muted;
-      this.silent = false;
-    }
+  pauseSelf() {
+    if (!this.audio.paused) this.selfPause = true;
+    this.audio.pause();
   }
 
   pause() {
+    this.finishRange('interrupted');
+    this.pauseSelf();
+  }
+
+  // iOS разрешает play() только из жеста пользователя (click/touchend). Вызывается синхронно
+  // в обработчике жеста: play()+pause() «активирует» элемент, и последующие play() после await
+  // (seek, паузы «Повтора») разрешены. Время и состояние отрезка не трогает.
+  unlock() {
+    if (this.unlocked || !this.audio.src) return;
+    this.unlocked = true;
+    if (!this.audio.paused) return;
+    const p = this.audio.play();
+    if (!this.audio.paused) this.selfPause = true;
     this.audio.pause();
+    if (p && p.catch) p.catch(() => {});
   }
 
   seek(ms) {
@@ -106,16 +112,23 @@ export class Player extends EventTarget {
   // Воспроизводит [startMs, endMs) и ставит на паузу в конце. Результат: "done" | "interrupted".
   async playRange(startMs, endMs) {
     this.finishRange('interrupted');
-    const result = new Promise((resolve) => { this.range = { end: endMs, resolve, finishing: false }; });
+    const result = new Promise((resolve) => { this.range = { end: endMs, resolve }; });
     const range = this.range;
     await this.seek(startMs);
     if (this.range !== range) return result;
     try {
       await this.play();
-    } catch (err) {
-      this.finishRange('interrupted');
+    } catch {
+      if (this.range === range) this.finishRange('interrupted');
     }
     return result;
+  }
+
+  // Конец текущего отрезка: пауза и результат "done".
+  endRange() {
+    if (!this.range) return;
+    this.pauseSelf();
+    this.finishRange('done');
   }
 
   finishRange(result) {
@@ -130,12 +143,7 @@ export class Player extends EventTarget {
     const tick = () => {
       if (this.audio.paused) return;
       const ms = this.ms;
-      if (this.range && ms >= this.range.end) {
-        this.range.finishing = true;
-        const r = this.range;
-        this.audio.pause();
-        if (this.range === r) this.finishRange('done');
-      }
+      if (this.range && ms >= this.range.end) this.endRange();
       this.emit('tick', { ms });
       this.raf = requestAnimationFrame(tick);
     };

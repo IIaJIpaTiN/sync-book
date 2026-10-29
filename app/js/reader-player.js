@@ -1,7 +1,7 @@
 // Плеер на экране чтения: нижняя панель, подсветка «Потока», следование за чтецом, «К чтецу»,
 // долгое нажатие по слову, переход к следующей главе по окончании аудио, сохранение позиции.
 import { Player } from './player.js';
-import { build, nextAudioChapter, sentenceIndexById } from './timeline.js';
+import { build, nextAudioChapter, sentenceIndexById, wordAt } from './timeline.js';
 import { Highlighter } from './sync.js';
 import { audioFile, audioName, putProgress } from './store.js';
 import { h, sheet } from './ui.js';
@@ -9,6 +9,7 @@ import { icon } from './icons.js';
 
 const LONG_PRESS_MS = 500;
 const SAVE_EVERY_MS = 2000;
+const BACKGROUND_SAVE_MS = 5000;
 
 export function attachPlayer(api) {
   const { st, el } = api;
@@ -22,6 +23,7 @@ export function attachPlayer(api) {
     lastSave: 0,
     lastSentence: -1,
     autoplayNext: false,
+    chapterGen: 0,
     longPress: null,
     longFired: false,
     settings: { rate: 1, highlight: 'both', repeatMode: 'auto', gapFactor: 1.5, repeats: 1, pauseOnTranslate: true },
@@ -148,12 +150,14 @@ export function attachPlayer(api) {
 
   // ---------- главы ----------
   api.on('chapter', async ({ meta }) => {
+    const gen = ++ctx.chapterGen;
     const wasPlaying = player.playing || ctx.autoplayNext;
     ctx.autoplayNext = false;
     if (ctx.hl) ctx.hl.clear();
     ctx.tl = build(st.data.en);
     ctx.hl = st.lang === 'en' ? new Highlighter(el.content, ctx.tl, ctx.settings.highlight) : null;
     const file = meta.audio ? await audioFile(st.book.id, audioName(meta.audio)) : null;
+    if (gen !== ctx.chapterGen) return; // пока читали файл, открыли другую главу
     ctx.hasAudio = Boolean(file);
     transport.hidden = !file;
     rateBtn.hidden = !file;
@@ -171,13 +175,24 @@ export function attachPlayer(api) {
         noAudio.hidden = false;
         return;
       }
+      if (gen !== ctx.chapterGen) return;
       ctx.loadedChapter = meta.id;
       player.rate = ctx.settings.rate;
-      // начало звука — первое предложение открытой страницы
-      await seekToSentenceEl(st.anchor);
+      const resume = api.initialProgress;
+      api.initialProgress = null;
+      if (resume && resume.chapterId === meta.id && resume.ms) {
+        // точное место прошлого сеанса, а не начало страницы
+        await player.seek(resume.ms);
+      } else {
+        // начало звука — первое предложение открытой страницы
+        await seekToSentenceEl(st.anchor);
+      }
+      if (gen !== ctx.chapterGen) return;
     }
     ctx.follow = true;
     onTick(player.ms);
+    const w = ctx.hl && ctx.hl.wordEl;
+    if (w && !st.paginator.isVisible(w)) api.showPage(st.paginator.pageOf(w), false);
     setMediaMeta(meta);
     if (wasPlaying) await player.play();
     api.emit('audio-ready');
@@ -225,21 +240,34 @@ export function attachPlayer(api) {
     await api.openChapter(next);
   });
 
-  api.on('ready', async ({ progress }) => {
-    if (progress && progress.ms && ctx.hasAudio && progress.chapterId === st.book.chapters[st.index].id) {
-      await player.seek(progress.ms);
-      onTick(player.ms);
-      const w = ctx.hl && ctx.hl.wordEl;
-      if (w) api.showPage(st.paginator.pageOf(w), false);
-    }
-  });
-
   api.on('lang', () => { if (ctx.hl) ctx.hl.clear(); });
 
-  // ---------- долгое нажатие по слову ----------
-  // первый жест на экране чтения разблокирует звук для iOS
+  // при перерасчёте страниц держим на экране звучащее предложение, если читаем вслед за чтецом
+  api.relayoutAnchor = () => (ctx.hasAudio && ctx.follow && st.lang === 'en' && ctx.hl && ctx.hl.sentEl) || null;
+
+  // ---------- сохранение позиции в фоне ----------
+  // при заблокированном экране requestAnimationFrame не работает, а timeupdate — работает
+  function saveNow() {
+    if (!ctx.tl || !ctx.hasAudio) return;
+    const w = wordAt(ctx.tl, player.ms);
+    if (w >= 0) saveAt(ctx.tl.wSent[w]);
+  }
+  player.audio.addEventListener('timeupdate', () => {
+    if (Date.now() - ctx.lastSave < BACKGROUND_SAVE_MS) return;
+    ctx.lastSave = Date.now();
+    saveNow();
+  });
+  const onHidden = () => { if (document.visibilityState === 'hidden') saveNow(); };
+  document.addEventListener('visibilitychange', onHidden);
+  window.addEventListener('pagehide', saveNow);
+
+  // ---------- разблокировка звука для iOS ----------
+  // активацией считаются click и touchend (не pointerdown); вызов синхронный, внутри жеста
   const unlock = () => { if (ctx.hasAudio) player.unlock(); };
-  el.reader.addEventListener('pointerdown', unlock, true);
+  el.reader.addEventListener('click', unlock, true);
+  el.reader.addEventListener('touchend', unlock, true);
+
+  // ---------- долгое нажатие по слову ----------
 
   api.on('pointerdown', ({ start }) => {
     clearTimeout(ctx.longPress);
@@ -278,6 +306,9 @@ export function attachPlayer(api) {
   }
 
   api.on('unmount', () => {
+    saveNow();
+    document.removeEventListener('visibilitychange', onHidden);
+    window.removeEventListener('pagehide', saveNow);
     player.unload();
     if (coverUrl) URL.revokeObjectURL(coverUrl);
     if ('mediaSession' in navigator) {

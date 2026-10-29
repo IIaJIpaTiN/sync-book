@@ -2,7 +2,7 @@
 // и черта-индикатор паузы под ним.
 import { createRepeat } from './repeat.js';
 import { chunkAt, firstChunkOfSentence } from './timeline.js';
-import { h } from './ui.js';
+import { h, sheet } from './ui.js';
 import { icon } from './icons.js';
 
 const realClock = {
@@ -45,11 +45,28 @@ export function attachRepeat(api) {
   }
 
   function ensureMachine() {
-    machine = createRepeat({ player, timeline: pc.tl, clock: realClock, getSettings: settings, onState });
+    // состояния старого автомата (прошлой главы) игнорируются
+    const m = createRepeat({
+      player, timeline: pc.tl, clock: realClock, getSettings: settings,
+      onState: (s) => { if (machine === m) onState(s); },
+    });
+    machine = m;
+  }
+
+  function dropMachine() {
+    const m = machine;
+    machine = null;
+    if (m) m.stop();
+    unmark();
+    gapBar.hidden = true;
   }
 
   function setMode(repeat) {
     if (repeat === Boolean(api.repeatActive)) return;
+    if (repeat && (st.lang !== 'en' || !pc.tl || !pc.hl)) {
+      sheet({ title: 'Режим «Повтор» работает с английским текстом', text: 'Переключите текст на EN и включите режим снова.', actions: [{ label: 'Понятно' }] });
+      return;
+    }
     const wasPlaying = player.playing;
     player.pause();
     api.repeatActive = repeat;
@@ -67,10 +84,8 @@ export function attachRepeat(api) {
       markChunk(i);
       if (wasPlaying) machine.start(i);
     } else {
-      if (machine) machine.stop();
-      unmark();
-      gapBar.hidden = true;
-      pc.hl.setMode(pc.settings.highlight);
+      dropMachine();
+      if (pc.hl) pc.hl.setMode(pc.settings.highlight);
       if (wasPlaying) player.play();
     }
     refresh();
@@ -183,8 +198,8 @@ export function attachRepeat(api) {
   });
 
   api.on('chapter', () => {
-    if (api.repeatActive && machine) machine.stop();
-    gapBar.hidden = true;
+    dropMachine();
+    modeSeg.classList.toggle('disabled', st.lang !== 'en');
   });
 
   api.on('page', () => { gapBar.hidden = true; });

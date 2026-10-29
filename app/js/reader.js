@@ -21,7 +21,8 @@ export function readerScreen() {
     chrome: true,
     hideTimer: null,
     resize: null,
-    hooks: [], // подписчики на смену страницы/главы (плеер, подсветка — следующие задачи)
+    gen: 0, // номер последнего запроса главы: устаревшие загрузки отбрасываются
+    loading: false,
   };
   const el = {};
 
@@ -51,9 +52,15 @@ export function readerScreen() {
 
   // ---------- главы и страницы ----------
   async function openChapter(index, { sentenceId = null, page = 0, toEnd = false, rsId = null } = {}) {
-    st.index = Math.max(0, Math.min(index, st.book.chapters.length - 1));
-    const meta = st.book.chapters[st.index];
-    st.data = await getChapter(st.book.id, meta.id);
+    const gen = ++st.gen;
+    const idx = Math.max(0, Math.min(index, st.book.chapters.length - 1));
+    const meta = st.book.chapters[idx];
+    st.loading = true;
+    const data = await getChapter(st.book.id, meta.id);
+    if (gen !== st.gen) return false; // за время чтения открыли другую главу
+    st.loading = false;
+    st.index = idx;
+    st.data = data;
     if (st.lang === 'ru' && !st.data.ru) st.lang = 'en';
     const body = st.lang === 'ru' ? renderRu(st.data.ru) : renderEn(st.data.en);
     el.content.replaceChildren(...body.childNodes);
@@ -111,6 +118,7 @@ export function readerScreen() {
   }
 
   async function turn(dir) {
+    if (st.loading) return; // глава ещё грузится — второй свайп не должен перескочить через неё
     const p = st.paginator;
     if (dir > 0) {
       if (p.page < p.pages - 1) showPage(p.page + 1);
@@ -122,7 +130,7 @@ export function readerScreen() {
 
   function relayout() {
     if (!st.paginator) return;
-    const anchor = st.anchor;
+    const anchor = (api.relayoutAnchor && api.relayoutAnchor()) || st.anchor;
     st.paginator.spread = autoSpread();
     st.paginator.layout();
     if (anchor && anchor.isConnected) anchorPageAfterRelayout(st.paginator, anchor);
@@ -228,6 +236,7 @@ export function readerScreen() {
       let index = 0;
       if (p) index = Math.max(0, st.book.chapters.findIndex((c) => c.id === p.chapterId));
       st.lang = (p && p.lang) || 'en';
+      api.initialProgress = p || null;
       for (const plugin of readerPlugins) await plugin(api);
       await openChapter(index, p ? { sentenceId: p.sentenceId ?? null, rsId: p.rsId ?? null } : {});
       api.emit('ready', { progress: p });
