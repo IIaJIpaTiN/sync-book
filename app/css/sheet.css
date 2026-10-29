@@ -64,3 +64,58 @@
   transform: scaleX(0);
   transition: transform 200ms linear;
 }
+
+/* карточки перевода */
+.card {
+  position: absolute;
+  z-index: 20;
+  background: var(--sheet);
+  color: var(--fg);
+  border: .5px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 14px 16px 12px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--fade), transform var(--fade);
+  font-family: var(--ui-font);
+}
+.card.open { opacity: 1; transform: none; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.card-word { font: 600 22px/1.2 var(--book-font); }
+.card-meta { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.card-lemma { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.card-tr { margin: 8px 0 0; font-size: 15px; line-height: 1.45; }
+.card-tr.muted, .card-online.error { color: var(--muted); font-size: 13px; }
+.card-senses {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.card-senses dt { color: var(--muted); font-size: 13px; padding-top: 1px; }
+.card-senses dd { margin: 0; }
+.card-en { margin: 0; font: 16px/1.5 var(--book-font); }
+.card-ru {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: .5px solid var(--line);
+  font: 16px/1.5 var(--book-font);
+}
+.card-online { margin: 10px 0 0; font-size: 15px; line-height: 1.45; }
+.card-online:empty { display: none; }
+.card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  background: var(--line);
+  font-size: 13px;
+  font-weight: 500;
+}
+.card-btn:disabled { opacity: .5; }
+.content .w-sel { background: var(--hl); box-shadow: 0 0 0 2px var(--hl), inset 0 -2px var(--accent); }

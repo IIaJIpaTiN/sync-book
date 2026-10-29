@@ -41,7 +41,8 @@ async function start() {
   const { attachPlayer } = await import('./reader-player.js');
   const { attachRepeat } = await import('./reader-repeat.js');
   const { attachLang } = await import('./reader-lang.js');
-  readerPlugins.push(attachPlayer, attachRepeat, attachLang);
+  const { attachTranslate } = await import('./reader-translate.js');
+  readerPlugins.push(attachPlayer, attachRepeat, attachLang, attachTranslate);
   registerScreen('read', readerScreen);
   window.addEventListener('hashchange', route);
   await route();
