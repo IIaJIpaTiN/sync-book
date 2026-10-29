@@ -93,6 +93,14 @@ def transcribe(wav: Path, out_jsonl: Path, prompt: str,
         f.write('{"done": true}\n')
 
 
+def is_done(out_jsonl: Path) -> bool:
+    if not out_jsonl.exists():
+        return False
+    with out_jsonl.open("rb") as f:
+        f.seek(max(0, out_jsonl.stat().st_size - 64))
+        return b'"done"' in f.read()
+
+
 def load(out_jsonl: Path) -> list[AsrWord]:
     words, done = [], False
     with out_jsonl.open(encoding="utf-8") as f:

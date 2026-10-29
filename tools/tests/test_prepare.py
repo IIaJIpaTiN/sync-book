@@ -39,3 +39,41 @@ def test_load_ignores_window_markers(tmp_path):
     p = tmp_path / "asr.jsonl"
     p.write_text('{"w": "a", "s": 0, "e": 1, "p": 1.0}\n{"win": 0}\n{"done": true}\n', encoding="utf-8")
     assert load(p) == [AsrWord("a", 0, 1, 1.0)]
+
+
+def test_stage_cache(tmp_path):
+    import os
+    import time
+
+    from syncbook.prepare import Stage, run_stages
+
+    src = tmp_path / "in.txt"
+    src.write_text("x")
+    out = tmp_path / "out.txt"
+    calls = []
+
+    def fn(ctx):
+        calls.append(1)
+        out.write_text("y")
+
+    stages = [Stage("one", fn, inputs=lambda ctx: [src], outputs=lambda ctx: [out])]
+    run_stages(stages, ctx=None)
+    run_stages(stages, ctx=None)
+    assert len(calls) == 1
+    run_stages(stages, ctx=None, force={"one"})
+    assert len(calls) == 2
+    time.sleep(0.01)
+    os.utime(src)  # вход стал новее выхода
+    run_stages(stages, ctx=None)
+    assert len(calls) == 3
+
+
+def test_is_done(tmp_path):
+    from syncbook.asr import is_done
+
+    p = tmp_path / "a.jsonl"
+    assert not is_done(p)
+    p.write_text('{"win": 0}\n', encoding="utf-8")
+    assert not is_done(p)
+    p.write_text('{"win": 0}\n{"done": true}\n', encoding="utf-8")
+    assert is_done(p)
