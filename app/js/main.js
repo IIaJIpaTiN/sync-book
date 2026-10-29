@@ -33,6 +33,8 @@ async function start() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW:', err));
   }
+  const { loadSettings, attachSettings } = await import('./settings.js');
+  await loadSettings();
   const { cleanupIncomplete } = await import('./importer.js');
   await cleanupIncomplete();
   const { libraryScreen } = await import('./library.js');
@@ -42,7 +44,7 @@ async function start() {
   const { attachRepeat } = await import('./reader-repeat.js');
   const { attachLang } = await import('./reader-lang.js');
   const { attachTranslate } = await import('./reader-translate.js');
-  readerPlugins.push(attachPlayer, attachRepeat, attachLang, attachTranslate);
+  readerPlugins.push(attachPlayer, attachRepeat, attachLang, attachTranslate, attachSettings);
   registerScreen('read', readerScreen);
   window.addEventListener('hashchange', route);
   await route();

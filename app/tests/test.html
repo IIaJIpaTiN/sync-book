@@ -17,7 +17,7 @@
   <div id="sandbox"></div>
   <script type="module">
     import { run } from './harness.js';
-    const suites = ['zip', 'importer', 'taps', 'paginator', 'timeline', 'repeat', 'bilingual', 'dict'];
+    const suites = ['zip', 'importer', 'taps', 'paginator', 'timeline', 'repeat', 'bilingual', 'dict', 'settings'];
     for (const s of suites) await import(`./${s}.test.js`);
     await run();
   </script>

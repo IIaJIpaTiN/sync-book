@@ -119,3 +119,72 @@
 }
 .card-btn:disabled { opacity: .5; }
 .content .w-sel { background: var(--hl); box-shadow: 0 0 0 2px var(--hl), inset 0 -2px var(--accent); }
+
+/* панель «Аа» */
+.settings-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(60px + env(safe-area-inset-top));
+  right: 12px;
+  width: min(360px, calc(100% - 24px));
+  max-height: calc(100% - 140px);
+  overflow-y: auto;
+  background: var(--sheet);
+  border: .5px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 14px 16px 16px;
+  font-size: 14px;
+}
+.set-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.size-btns { display: flex; border-radius: 10px; background: var(--line); overflow: hidden; }
+.size-btn { width: 56px; height: 38px; font-family: var(--book-font); }
+.size-btn.small { font-size: 15px; }
+.size-btn.big { font-size: 23px; border-left: .5px solid var(--line); }
+.size-btn:active { background: var(--line); }
+.themes { display: flex; gap: 10px; }
+.theme-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: .5px solid rgba(0, 0, 0, .25);
+}
+.theme-dot.on { box-shadow: 0 0 0 2px var(--sheet), 0 0 0 4px var(--accent); }
+.fonts { display: flex; flex-direction: column; margin: 14px -16px 4px; border-top: .5px solid var(--line); }
+.font-opt {
+  text-align: left;
+  padding: 9px 16px;
+  font-size: 17px;
+  border-bottom: .5px solid var(--line);
+}
+.font-opt.on { color: var(--accent); }
+.font-opt.on::after { content: '✓'; float: right; font-family: var(--ui-font); }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.set-label { color: var(--fg); white-space: nowrap; }
+.seg.wide .seg-opt { padding: 5px 9px; }
+.set-section { margin: 18px 0 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.set-slider { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end; }
+.set-slider input { width: 150px; accent-color: var(--accent); }
+.set-value { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.switch {
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--line);
+  position: relative;
+  transition: background var(--fade);
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  transition: transform var(--fade);
+}
+.switch.on { background: var(--accent); }
+.switch.on::after { transform: translateX(18px); }
