@@ -1,0 +1,5 @@
+{"word": "young", "pos": "adj", "sounds": [{"ipa": "/jʌŋ/", "tags": ["UK"]}, {"ipa": "/jəŋ/", "tags": ["US"]}], "senses": [{"glosses": ["not old"]}], "translations": [{"lang": "Russian", "code": "ru", "word": "молодой"}, {"lang": "German", "code": "de", "word": "jung"}, {"lang": "Russian", "code": "ru", "word": "юный"}, {"lang": "Russian", "code": "ru", "word": "молодой"}]}
+{"word": "young", "pos": "noun", "senses": [{"glosses": ["offspring"], "translations": [{"lang": "Russian", "code": "ru", "word": "детёныш"}]}]}
+{"word": "walk", "pos": "verb", "sounds": [{"ipa": "/wɔːk/", "tags": ["Received-Pronunciation"]}], "translations": [{"code": "ru", "word": "идти"}, {"code": "ru", "word": "ходить"}]}
+{"word": "keep", "pos": "noun", "sounds": [{"ipa": "/kiːp/"}], "translations": [{"code": "ru", "word": "донжон"}]}
+{"word": "zebra", "pos": "noun", "translations": [{"code": "ru", "word": "зебра"}]}
