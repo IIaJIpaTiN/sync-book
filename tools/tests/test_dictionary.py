@@ -29,3 +29,7 @@ def test_coverage():
     occ = [("young", "young", "ADJ"), ("old", "old", "ADJ")]
     _, index_of = build(occ, idx)
     assert coverage(occ, index_of) == 0.5
+
+
+def test_stress_marks_removed():
+    assert scan(FIX, {"keep"})["keep"]["senses"][0]["tr"] == ["цитадель"]

@@ -50,7 +50,7 @@ def scan(jsonl: Path, wanted: set[str]) -> dict[str, dict]:
             trs = list(d.get("translations", []))
             for s in d.get("senses", []):
                 trs.extend(s.get("translations", []))
-            ru = [t["word"] for t in trs if t.get("code") == "ru" and t.get("word")]
+            ru = [t["word"].replace("́", "") for t in trs if t.get("code") == "ru" and t.get("word")]
             if word not in ipa or ipa[word] is None:
                 ipa[word] = _ipa(d.get("sounds", []))
             if not ru:
