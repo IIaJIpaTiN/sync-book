@@ -9,8 +9,9 @@ export class Player extends EventTarget {
     this.url = null;
     this.raf = 0;
     this.range = null; // { end, resolve }
-    this.audio.addEventListener('play', () => { this.emit('playstate'); this.loop(); });
+    this.audio.addEventListener('play', () => { if (this.silent) return; this.emit('playstate'); this.loop(); });
     this.audio.addEventListener('pause', () => {
+      if (this.silent) return;
       this.emit('playstate');
       if (this.range && !this.range.finishing) this.finishRange('interrupted');
     });
@@ -67,6 +68,26 @@ export class Player extends EventTarget {
 
   async play() {
     await this.audio.play();
+  }
+
+  // iOS разрешает play() только из жеста пользователя. Первый жест «разблокирует» элемент
+  // беззвучным запуском, чтобы последующие play() после await (seek, паузы «Повтора») работали.
+  async unlock() {
+    if (this.unlocked || !this.audio.paused) { this.unlocked = true; return; }
+    this.unlocked = true;
+    const { currentTime, muted } = this.audio;
+    this.audio.muted = true;
+    this.silent = true;
+    try {
+      await this.audio.play();
+      this.audio.pause();
+    } catch {
+      this.unlocked = false;
+    } finally {
+      this.audio.currentTime = currentTime;
+      this.audio.muted = muted;
+      this.silent = false;
+    }
   }
 
   pause() {

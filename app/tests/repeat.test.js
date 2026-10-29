@@ -134,3 +134,18 @@ test('player: seek completes before play', async () => {
   assertEqual(log.join(','), 'currentTime=,seeked,play');
   audio.paused = true;
 });
+
+test('player: unlock plays muted once and restores state', async () => {
+  const log = [];
+  const audio = {
+    paused: true, muted: false, currentTime: 12.5,
+    addEventListener() {}, removeEventListener() {},
+    play() { log.push(`play muted=${this.muted}`); this.paused = false; this.currentTime = 12.6; return Promise.resolve(); },
+    pause() { log.push('pause'); this.paused = true; },
+  };
+  const p = new Player(audio);
+  await p.unlock();
+  await p.unlock();
+  assertEqual(log, ['play muted=true', 'pause']);
+  assertEqual([audio.muted, audio.currentTime, audio.paused], [false, 12.5, true]);
+});

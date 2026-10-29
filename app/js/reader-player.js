@@ -237,6 +237,10 @@ export function attachPlayer(api) {
   api.on('lang', () => { if (ctx.hl) ctx.hl.clear(); });
 
   // ---------- долгое нажатие по слову ----------
+  // первый жест на экране чтения разблокирует звук для iOS
+  const unlock = () => { if (ctx.hasAudio) player.unlock(); };
+  el.reader.addEventListener('pointerdown', unlock, true);
+
   api.on('pointerdown', ({ start }) => {
     clearTimeout(ctx.longPress);
     ctx.longFired = false;
