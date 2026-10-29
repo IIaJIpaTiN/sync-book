@@ -1,0 +1,97 @@
+/* Темы и переменные настроек чтения. Тема — атрибут data-theme на <html>. */
+:root,
+[data-theme="sepia"] {
+  --bg: #F8F1E3;
+  --fg: #4F321C;
+  --muted: #9A836B;
+  --accent: #2F4B7C;
+  --hl: rgba(47, 75, 124, .10);
+  --bar: rgba(248, 241, 227, .94);
+  --line: rgba(79, 50, 28, .14);
+  --sheet: #FCF8EF;
+  --shadow: 0 10px 30px rgba(60, 40, 20, .16), 0 1px 3px rgba(60, 40, 20, .10);
+  color-scheme: light;
+}
+[data-theme="paper"] {
+  --bg: #FFFFFF;
+  --fg: #1D1D1F;
+  --muted: #8E8E93;
+  --accent: #2F4B7C;
+  --hl: rgba(47, 75, 124, .08);
+  --bar: rgba(255, 255, 255, .94);
+  --line: rgba(0, 0, 0, .10);
+  --sheet: #FFFFFF;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .14), 0 1px 3px rgba(0, 0, 0, .08);
+  color-scheme: light;
+}
+[data-theme="gray"] {
+  --bg: #4A4A4D;
+  --fg: #E8E8EA;
+  --muted: #AEAEB2;
+  --accent: #AFC3EA;
+  --hl: rgba(175, 195, 234, .16);
+  --bar: rgba(74, 74, 77, .94);
+  --line: rgba(255, 255, 255, .14);
+  --sheet: #3A3A3C;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .35), 0 1px 3px rgba(0, 0, 0, .3);
+  color-scheme: dark;
+}
+[data-theme="night"] {
+  --bg: #000000;
+  --fg: #B4B4B8;
+  --muted: #6E6E73;
+  --accent: #8FA8D8;
+  --hl: rgba(143, 168, 216, .14);
+  --bar: rgba(18, 18, 18, .94);
+  --line: rgba(255, 255, 255, .12);
+  --sheet: #1C1C1E;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .6), 0 0 0 .5px rgba(255, 255, 255, .08);
+  color-scheme: dark;
+}
+
+:root {
+  --ui-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --book-font: "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  --book-size: 18px;
+  --book-leading: 1.6;
+  --page-margin: 48px;
+  --book-align: justify;
+  --book-hyphens: auto;
+  --turn: 250ms;
+  --fade: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --turn: 0ms; }
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--ui-font);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--fade), color var(--fade);
+}
+body { overflow: hidden; overscroll-behavior: none; }
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+button:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+#app { height: 100%; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}

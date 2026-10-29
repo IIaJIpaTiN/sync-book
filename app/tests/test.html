@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>SyncBook — тесты</title>
+  <link rel="stylesheet" href="../css/tokens.css">
+  <style>
+    body { overflow: auto; padding: 24px; font: 14px/1.5 var(--ui-font); }
+    .pass { color: #2e7d32; }
+    .fail { color: #c62828; }
+    #sandbox { position: absolute; left: -10000px; top: 0; }
+  </style>
+</head>
+<body>
+  <h1 id="summary">Выполняется…</h1>
+  <ul id="results"></ul>
+  <div id="sandbox"></div>
+  <script type="module">
+    import { run } from './harness.js';
+    const suites = [];
+    for (const s of suites) await import(`./${s}.test.js`);
+    await run();
+  </script>
+</body>
+</html>
