@@ -24,7 +24,7 @@ export function attachPlayer(api) {
     autoplayNext: false,
     longPress: null,
     longFired: false,
-    settings: { rate: 1, highlight: 'both' },
+    settings: { rate: 1, highlight: 'both', repeatMode: 'auto', gapFactor: 1.5, repeats: 1, pauseOnTranslate: true },
   };
   api.player = ctx;
   api.currentMs = () => player.ms;

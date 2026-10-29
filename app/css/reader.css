@@ -212,3 +212,42 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+/* «Повтор»: отрывок подсвечен целиком, под ним черта-индикатор паузы */
+.content .c-on {
+  background: var(--hl);
+  box-shadow: 0 0 0 2px var(--hl);
+  border-radius: 0;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.content .c-on.c-first { border-radius: 3px 0 0 3px; }
+.content .c-on.c-last { border-radius: 0 3px 3px 0; }
+.content .c-on.c-first.c-last { border-radius: 3px; }
+.content .c-on.w-on { box-shadow: 0 0 0 2px var(--hl), inset 0 -2px var(--accent); }
+.gap-bar {
+  position: absolute;
+  z-index: 5;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--line);
+  overflow: hidden;
+  pointer-events: none;
+}
+.gap-fill {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+.repeat-status {
+  flex: 1;
+  text-align: right;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.transport.repeat { margin: 0 12px; }
+.seg.mode { font-size: 12px; }

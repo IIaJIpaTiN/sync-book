@@ -1,5 +1,5 @@
 // Service Worker: офлайн-кэш оболочки приложения. Увеличивайте APP_VERSION при каждом изменении файлов app/.
-const APP_VERSION = 5;
+const APP_VERSION = 6;
 const CACHE = `syncbook-v${APP_VERSION}`;
 const SHELL = [
   './',
@@ -26,6 +26,8 @@ const SHELL = [
   'js/player.js',
   'js/sync.js',
   'js/reader-player.js',
+  'js/repeat.js',
+  'js/reader-repeat.js',
   'icons/icon.svg',
   'icons/icon-180.png',
   'icons/icon-192.png',
@@ -56,7 +58,7 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (DEV) {
     // при разработке — сначала сеть, кэш только как запасной вариант
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request, { ignoreSearch: true })));
+    e.respondWith(fetch(e.request, { cache: 'no-store' }).catch(() => caches.match(e.request, { ignoreSearch: true })));
     return;
   }
   e.respondWith(
