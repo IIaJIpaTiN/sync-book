@@ -40,7 +40,8 @@ async function start() {
   const { readerScreen, readerPlugins } = await import('./reader.js');
   const { attachPlayer } = await import('./reader-player.js');
   const { attachRepeat } = await import('./reader-repeat.js');
-  readerPlugins.push(attachPlayer, attachRepeat);
+  const { attachLang } = await import('./reader-lang.js');
+  readerPlugins.push(attachPlayer, attachRepeat, attachLang);
   registerScreen('read', readerScreen);
   window.addEventListener('hashchange', route);
   await route();
