@@ -173,3 +173,42 @@
   border-top: .5px solid var(--line);
 }
 .toc-item.current { color: var(--accent); font-weight: 600; }
+
+/* линия чтеца */
+.content .s-on {
+  background: var(--hl);
+  box-shadow: 0 0 0 2px var(--hl);
+  border-radius: 3px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.content .w-on { box-shadow: inset 0 -2px var(--accent); }
+.content .s-on .w-on { box-shadow: 0 0 0 2px var(--hl), inset 0 -2px var(--accent); }
+
+/* плеер */
+.mode-slot { display: flex; align-items: center; }
+.transport { display: flex; align-items: center; gap: 6px; margin: 0 auto; }
+.transport .play { width: 48px; height: 48px; color: var(--accent); }
+.chip {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--line);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.no-audio { flex: 1; text-align: center; font-size: 14px; color: var(--muted); }
+.to-reader {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--sheet);
+  color: var(--accent);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 600;
+}

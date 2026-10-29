@@ -37,7 +37,9 @@ async function start() {
   await cleanupIncomplete();
   const { libraryScreen } = await import('./library.js');
   registerScreen('library', libraryScreen);
-  const { readerScreen } = await import('./reader.js');
+  const { readerScreen, readerPlugins } = await import('./reader.js');
+  const { attachPlayer } = await import('./reader-player.js');
+  readerPlugins.push(attachPlayer);
   registerScreen('read', readerScreen);
   window.addEventListener('hashchange', route);
   await route();
