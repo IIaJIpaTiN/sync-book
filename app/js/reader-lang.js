@@ -30,7 +30,8 @@ export function attachLang(api) {
       await api.setLang('ru', { rsId });
       // если в русском тексте не листали, обратно вернёмся ровно на эту английскую фразу
       back = { enId: anchor ? enId : null, chapter: st.index, page: st.paginator.page };
-      if (readerHere && pc.settings.highlight !== 'off') {
+      // подсвечиваем место чтеца, а если его нет на экране — перевод первой английской фразы страницы
+      if (anchor && (!pc || pc.settings.highlight !== 'off')) {
         const g = groupFor(enId, align);
         flash(g.ru.length ? g.ru : [rsId]);
       }
