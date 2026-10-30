@@ -3,9 +3,10 @@
 // Назад: предыдущая карточка наезжает слева поверх текущей (та притеняется).
 
 export const SHADE = 0.16;
-const BASE_MS = 380;
+// Сняты с записи Apple Books: ~¾ пути за первые ~220 мс, затем плавный доезд, всего ~600 мс.
+const BASE_MS = 600;
 const MIN_MS = 120;
-const EASE = 'cubic-bezier(.2, .75, .3, 1)';
+const EASE = 'cubic-bezier(.25, .46, .45, .94)';
 
 // p — доля пройденного перелистывания, 0..1.
 export function slidePositions(dir, p, width) {
