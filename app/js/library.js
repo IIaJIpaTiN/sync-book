@@ -3,6 +3,7 @@ import { getBooks, getProgress, deleteBook, hasAllAudio } from './store.js';
 import { importSyncbook } from './importer.js';
 import { go } from './main.js';
 import { h, sheet } from './ui.js';
+import { icon } from './icons.js';
 
 const LONG_PRESS_MS = 600;
 
@@ -15,7 +16,7 @@ export function libraryScreen() {
     const books = (await getBooks()).filter((b) => b.status === 'ready')
       .sort((a, b) => b.importedAt - a.importedAt);
     const fileInput = h('input', { type: 'file', accept: '.syncbook', hidden: true, onchange: onFile });
-    const importBtn = h('button', { class: 'lib-import', onclick: () => fileInput.click() }, 'Импорт');
+    const importBtn = h('button', { class: 'lib-import', 'aria-label': 'Добавить книгу', onclick: () => fileInput.click() }, icon('plus', 26));
     const header = h('header', { class: 'lib-head' }, h('h1', {}, 'Библиотека'), importBtn, fileInput);
     let body;
     if (!books.length) {

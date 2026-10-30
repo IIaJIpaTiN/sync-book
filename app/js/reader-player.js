@@ -3,6 +3,7 @@
 import { Player } from './player.js';
 import { build, nextAudioChapter, sentenceIndexById, wordAt } from './timeline.js';
 import { Highlighter } from './sync.js';
+import { relayoutTarget } from './paginator.js';
 import { audioFile, audioName, putProgress } from './store.js';
 import { h, sheet } from './ui.js';
 import { icon } from './icons.js';
@@ -33,14 +34,16 @@ export function attachPlayer(api) {
   api.isPlaying = () => player.playing;
 
   // ---------- нижняя панель ----------
-  const playBtn = h('button', { class: 'bar-btn play', 'aria-label': 'Воспроизвести', onclick: () => toggle() }, icon('play', 26));
-  const back = h('button', { class: 'bar-btn', 'aria-label': 'Назад на 15 секунд', onclick: () => skip(-15000) }, icon('back15'));
-  const fwd = h('button', { class: 'bar-btn', 'aria-label': 'Вперёд на 15 секунд', onclick: () => skip(15000) }, icon('fwd15'));
+  const playBtn = h('button', { class: 'bar-btn play', 'aria-label': 'Воспроизвести', onclick: () => toggle() }, icon('play', 34));
+  const back = h('button', { class: 'bar-btn', 'aria-label': 'Назад на 15 секунд', onclick: () => skip(-15000) }, icon('back15', 30));
+  const fwd = h('button', { class: 'bar-btn', 'aria-label': 'Вперёд на 15 секунд', onclick: () => skip(15000) }, icon('fwd15', 30));
   const rateBtn = h('button', { class: 'chip', 'aria-label': 'Скорость', onclick: () => api.emit('rate-click') }, '1.0×');
   const transport = h('div', { class: 'transport' }, back, playBtn, fwd);
   const noAudio = h('div', { class: 'no-audio', hidden: true }, 'Аудио этой главы недоступно');
   el.modeSlot = h('div', { class: 'mode-slot' });
-  el.controls.append(el.modeSlot, transport, rateBtn, noAudio);
+  el.left.append(el.modeSlot);
+  el.center.append(transport, noAudio);
+  el.right.prepend(rateBtn);
   el.toReader = h('button', { class: 'to-reader', hidden: true, onclick: () => backToReader() }, 'К чтецу');
   el.reader.append(el.toReader);
   el.transport = transport;
@@ -54,7 +57,7 @@ export function attachPlayer(api) {
   api.setRate = setRate;
 
   function refreshPlayBtn() {
-    playBtn.replaceChildren(icon(player.playing ? 'pause' : 'play', 26));
+    playBtn.replaceChildren(icon(player.playing ? 'pause' : 'play', 34));
     playBtn.setAttribute('aria-label', player.playing ? 'Пауза' : 'Воспроизвести');
     api.setChrome(st.chrome);
   }
@@ -128,7 +131,7 @@ export function attachPlayer(api) {
   function updateRemaining(ms) {
     const left = Math.max(0, (player.durationMs - ms) / ctx.settings.rate);
     const min = Math.round(left / 60000);
-    el.pageinfo.textContent = `${el.folio.textContent} · осталось ${min < 1 ? 'меньше минуты' : `${min} мин`}`;
+    el.remaining.textContent = ` · осталось ${min < 1 ? 'меньше минуты' : `${min} мин`}`;
   }
 
   async function backToReader() {
@@ -152,6 +155,7 @@ export function attachPlayer(api) {
   api.on('chapter', async ({ meta }) => {
     const gen = ++ctx.chapterGen;
     const wasPlaying = player.playing || ctx.autoplayNext;
+    let jumpToReader = false;
     ctx.autoplayNext = false;
     if (ctx.hl) ctx.hl.clear();
     ctx.tl = build(st.data.en);
@@ -183,16 +187,21 @@ export function attachPlayer(api) {
       if (resume && resume.chapterId === meta.id && resume.ms) {
         // точное место прошлого сеанса, а не начало страницы
         await player.seek(resume.ms);
+        jumpToReader = true;
       } else {
         // начало звука — первое предложение открытой страницы
         await seekToSentenceEl(st.anchor);
       }
       if (gen !== ctx.chapterGen) return;
     }
-    ctx.follow = true;
+    // подсветка обновляется без перелистывания: к чтецу переходим только при возобновлении сеанса,
+    // а при возврате с русского текста остаёмся на той странице, которую читали
+    ctx.follow = false;
     onTick(player.ms);
     const w = ctx.hl && ctx.hl.wordEl;
-    if (w && !st.paginator.isVisible(w)) api.showPage(st.paginator.pageOf(w), false);
+    if (jumpToReader && w && !st.paginator.isVisible(w)) api.showPage(st.paginator.pageOf(w), false);
+    ctx.follow = currentWordVisible();
+    el.toReader.hidden = ctx.follow || !wasPlaying || st.lang !== 'en';
     setMediaMeta(meta);
     if (wasPlaying) await player.play();
     api.emit('audio-ready');
@@ -240,10 +249,12 @@ export function attachPlayer(api) {
     await api.openChapter(next);
   });
 
-  api.on('lang', () => { if (ctx.hl) ctx.hl.clear(); });
 
   // при перерасчёте страниц держим на экране звучащее предложение, если читаем вслед за чтецом
-  api.relayoutAnchor = () => (ctx.hasAudio && ctx.follow && st.lang === 'en' && ctx.hl && ctx.hl.sentEl) || null;
+  api.audioOnScreen = () => Boolean(ctx.hasAudio && st.lang === 'en' && ctx.hl && ctx.hl.sentEl && currentWordVisible());
+  api.relayoutAnchor = () => relayoutTarget({
+    audioEl: ctx.hl && ctx.hl.sentEl, audioVisible: api.audioOnScreen(), pageAnchor: st.anchor,
+  });
 
   // ---------- сохранение позиции в фоне ----------
   // при заблокированном экране requestAnimationFrame не работает, а timeupdate — работает

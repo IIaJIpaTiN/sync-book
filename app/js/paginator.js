@@ -4,6 +4,8 @@
 export const autoSpread = () =>
   (matchMedia('(orientation: landscape) and (min-width: 1000px)').matches ? 2 : 1);
 
+const DEFAULT_MARGIN = 0.07; // доля ширины экрана
+
 export class Paginator {
   constructor(viewport, content, { spread } = {}) {
     this.viewport = viewport;
@@ -14,18 +16,28 @@ export class Paginator {
     this.step = 1;
   }
 
+  // Поле M у краёв и такой же зазор M между страницами разворота. В multicol расстояние между
+  // любыми соседними колонками одинаково, поэтому содержимое сдвинуто внутрь на M/2, у колонок
+  // отступ M/2 по краям, а шаг листания — ширина без этих M/2 с каждой стороны.
   layout() {
     const width = this.viewport.clientWidth;
     const height = this.viewport.clientHeight;
-    const margin = parseFloat(getComputedStyle(this.viewport).getPropertyValue('--page-margin')) || 48;
-    this.step = width;
+    const ratio = parseFloat(getComputedStyle(this.viewport).getPropertyValue('--page-margin'));
+    const margin = Math.max(16, Math.round(width * (ratio > 0 && ratio < 1 ? ratio : DEFAULT_MARGIN)));
+    const inner = width - margin;
+    const k = this.spread;
+    this.step = inner;
+    this.margin = margin;
     Object.assign(this.content.style, {
       boxSizing: 'border-box',
-      width: `${width}px`,
+      marginLeft: `${margin / 2}px`,
+      width: `${inner}px`,
       height: `${height}px`,
-      padding: `0 ${margin}px`,
-      columnCount: String(this.spread),
-      columnGap: `${2 * margin}px`,
+      padding: `0 ${margin / 2}px`,
+      columnGap: `${margin}px`,
+      // явная ширина колонки: при column-count 1 без неё WebKit вообще не включает колонки
+      columnWidth: `${(inner - k * margin) / k - 0.5}px`,
+      columnCount: String(k),
       columnFill: 'auto',
     });
     const last = this.content.lastElementChild;
@@ -58,6 +70,12 @@ export class Paginator {
   isVisible(el) {
     return this.pageOf(el) === this.page;
   }
+}
+
+// Что держать на экране при пересчёте страниц: звучащую фразу — только если она и так была
+// на экране, иначе первую фразу текущей страницы (иначе пауза + смена шрифта уводит к чтецу).
+export function relayoutTarget({ audioEl, audioVisible, pageAnchor }) {
+  return audioEl && audioVisible ? audioEl : pageAnchor;
 }
 
 export function anchorPageAfterRelayout(paginator, anchorEl) {

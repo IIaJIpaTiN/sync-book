@@ -18,6 +18,11 @@ test('settings: css variables', () => {
   const v = toCssVars({ ...DEFAULTS, sizeStep: 7, font: 'charter', leading: 'loose', margins: 'wide', align: 'left', hyphens: false });
   assertEqual(v, {
     '--book-size': '22px', '--book-font': 'Charter, "Bitstream Charter", serif', '--book-leading': '1.8',
-    '--page-margin': '80px', '--book-align': 'left', '--book-hyphens': 'manual',
+    '--page-margin': '0.11', '--book-align': 'left', '--book-hyphens': 'manual',
   });
+});
+test('settings: page numbering by chapter by default, by book on request', () => {
+  assertEqual(normalize({}).pageNumbering, 'chapter');
+  assertEqual(normalize({ pageNumbering: 'book' }).pageNumbering, 'book');
+  assertEqual(normalize({ pageNumbering: 'weird' }).pageNumbering, 'chapter');
 });

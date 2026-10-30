@@ -81,3 +81,41 @@ test('render: spans for sentences and words with global word index', () => {
   assertEqual([...p.querySelectorAll('[data-s]')].map((s) => s.textContent), ['He said no.', 'Go.']);
   assertEqual(p.querySelector('i').textContent, 'said');
 });
+
+function mkMargins({ width, spread, ratio }) {
+  const p = mk({ width, height: 600, paragraphs: 30 });
+  p.viewport.style.setProperty('--page-margin', String(ratio));
+  p.spread = spread;
+  p.layout();
+  return p;
+}
+
+test('paginator: spread gap between pages equals outer margin', () => {
+  const p = mkMargins({ width: 1000, spread: 2, ratio: 0.1 });
+  const vp = p.viewport.getBoundingClientRect();
+  const onPage = [...p.content.children].filter((el) => p.pageOf(el) === 0);
+  const rects = onPage.flatMap((el) => [...el.getClientRects()]);
+  const left = Math.min(...rects.map((r) => r.left)) - vp.left;
+  const leftColRight = Math.max(...rects.filter((r) => r.left - vp.left < 500).map((r) => r.right)) - vp.left;
+  const rightColLeft = Math.min(...rects.filter((r) => r.left - vp.left > 500).map((r) => r.left)) - vp.left;
+  const right = vp.right - Math.max(...rects.map((r) => r.right));
+  assertEqual([Math.round(left), Math.round(rightColLeft - leftColRight), Math.round(right)], [100, 100, 100]);
+});
+
+test('paginator: single column sets an explicit column width (WebKit ignores column-count 1)', () => {
+  const p = mkMargins({ width: 800, spread: 1, ratio: 0.1 });
+  assertEqual(p.content.style.columnWidth.endsWith('px'), true);
+  assertEqual(p.layout() > 2, true);
+  const vp = p.viewport.getBoundingClientRect();
+  const r = p.content.firstElementChild.getBoundingClientRect();
+  assertEqual([Math.round(r.left - vp.left), Math.round(vp.right - r.right)], [80, 80]);
+});
+
+test('paginator: relayout keeps the spoken sentence only if it was on screen', async () => {
+  const { relayoutTarget } = await import('../js/paginator.js');
+  const audio = { id: 'audio' };
+  const page = { id: 'page' };
+  assertEqual(relayoutTarget({ audioEl: audio, audioVisible: true, pageAnchor: page }).id, 'audio');
+  assertEqual(relayoutTarget({ audioEl: audio, audioVisible: false, pageAnchor: page }).id, 'page');
+  assertEqual(relayoutTarget({ audioEl: null, audioVisible: false, pageAnchor: page }).id, 'page');
+});

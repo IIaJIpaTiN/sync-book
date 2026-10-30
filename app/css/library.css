@@ -7,7 +7,7 @@
 }
 .lib-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   max-width: 1100px;
   margin: 24px auto 32px;
@@ -20,10 +20,15 @@
   letter-spacing: -.02em;
 }
 .lib-import {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
   color: var(--accent);
-  font-size: 17px;
-  padding: 8px 4px;
 }
+.lib-import:active { background: var(--line); }
 .lib-grid {
   max-width: 1100px;
   margin: 0 auto;

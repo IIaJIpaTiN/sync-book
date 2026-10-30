@@ -6,8 +6,12 @@ import { classifyTap } from './taps.js';
 import { go } from './main.js';
 import { h, sheet } from './ui.js';
 import { icon } from './icons.js';
+import {
+  bookPosition, cachedCounts, chapterStartPages, folioText, formatDuration, layoutKey, measureBook,
+} from './bookpages.js';
 
 const SWIPE_PX = 40;
+const MEASURE_DELAY_MS = 700;
 const CHROME_HIDE_MS = 3000;
 
 export function readerScreen() {
@@ -23,6 +27,10 @@ export function readerScreen() {
     resize: null,
     gen: 0, // номер последнего запроса главы: устаревшие загрузки отбрасываются
     loading: false,
+    numbering: 'chapter', // колонтитул: страницы главы или всей книги
+    counts: null, // число страниц каждой главы при текущей вёрстке (считается в фоне)
+    countsKey: null,
+    measureTimer: null,
   };
   const el = {};
 
@@ -42,9 +50,16 @@ export function readerScreen() {
     el.viewport = h('div', { class: 'viewport' }, el.content);
     el.runhead = h('div', { class: 'runhead' });
     el.folio = h('div', { class: 'folio' });
-    el.controls = h('div', { class: 'controls' });
-    el.pageinfo = h('div', { class: 'pageinfo' });
-    el.bottom = h('footer', { class: 'bar bottom' }, el.controls, el.pageinfo);
+    el.left = h('div', { class: 'bar-left' });
+    el.center = h('div', { class: 'bar-center' });
+    el.pageNum = h('span', { class: 'page-num' });
+    el.remaining = h('span', { class: 'remaining' });
+    el.pageinfo = h('button', {
+      class: 'pageinfo', 'aria-label': 'Нумерация страниц: глава или книга',
+      onclick: () => api.emit('numbering-toggle'),
+    }, el.pageNum, el.remaining);
+    el.right = h('div', { class: 'bar-right' }, el.pageinfo);
+    el.bottom = h('footer', { class: 'bar bottom' }, el.left, el.center, el.right);
     el.reader = h('div', { class: 'reader chrome-on' }, el.runhead, el.viewport, el.folio, el.top, el.bottom);
     root.append(el.reader);
     bindGestures();
@@ -74,19 +89,46 @@ export function readerScreen() {
     const anchorEl = anchorSel && el.content.querySelector(anchorSel);
     if (anchorEl) target = st.paginator.pageOf(anchorEl);
     if (toEnd) target = st.paginator.pages - 1;
+    if (st.counts) st.counts[st.index] = st.paginator.pages;
     showPage(target, false);
     api.emit('chapter', { index: st.index, meta });
+    scheduleMeasure();
   }
 
   function showPage(page, animate = true) {
     st.paginator.goTo(page, { animate });
     st.anchor = firstVisibleSentence();
-    const n = st.paginator.pages;
-    const text = `${st.paginator.page + 1} из ${n}`;
-    el.folio.textContent = text;
-    el.pageinfo.textContent = `стр. ${text}`;
+    updateFolio();
     saveProgress();
     api.emit('page', { page: st.paginator.page });
+  }
+
+  function updateFolio() {
+    const text = folioText({
+      mode: st.numbering, page: st.paginator.page, pages: st.paginator.pages, counts: st.counts, index: st.index,
+    });
+    el.folio.textContent = text;
+    el.pageNum.textContent = `стр. ${text}`;
+  }
+
+  // Страницы всей книги считаются в фоне; при смене вёрстки — заново (из кэша, если уже считали).
+  function scheduleMeasure() {
+    clearTimeout(st.measureTimer);
+    st.measureTimer = setTimeout(async () => {
+      const spread = st.paginator.spread;
+      const key = layoutKey(el.viewport, { lang: st.lang, spread });
+      if (st.countsKey === key) return;
+      const counts = cachedCounts(st.book.id, key) || await measureBook({
+        book: st.book, lang: st.lang, spread, viewport: el.viewport, host: el.reader, key,
+        isStale: () => !el.reader.isConnected || layoutKey(el.viewport, { lang: st.lang, spread: st.paginator.spread }) !== key,
+      });
+      if (!counts) return;
+      st.counts = counts.slice();
+      st.counts[st.index] = st.paginator.pages;
+      st.countsKey = key;
+      updateFolio();
+      api.emit('folio');
+    }, MEASURE_DELAY_MS);
   }
 
   function sentenceEls() {
@@ -130,11 +172,14 @@ export function readerScreen() {
 
   function relayout() {
     if (!st.paginator) return;
-    const anchor = (api.relayoutAnchor && api.relayoutAnchor()) || st.anchor;
+    const anchor = api.relayoutAnchor ? api.relayoutAnchor() : st.anchor;
     st.paginator.spread = autoSpread();
     st.paginator.layout();
     if (anchor && anchor.isConnected) anchorPageAfterRelayout(st.paginator, anchor);
+    st.counts = null;
+    st.countsKey = null;
     showPage(st.paginator.page, false);
+    scheduleMeasure();
   }
 
   // ---------- панели ----------
@@ -150,16 +195,39 @@ export function readerScreen() {
     el.langBtn.classList.toggle('disabled', !st.data.ru);
   }
 
+  // Оглавление в духе Books: обложка, название, текущая страница; в строках — номер, название,
+  // длительность аудио при текущей скорости и страница начала главы.
   function showToc() {
-    const list = h('ol', { class: 'toc' }, st.book.chapters.map((c, i) => h('li', {},
-      h('button', {
-        class: `toc-item${i === st.index ? ' current' : ''}`,
+    const rate = (api.player && api.player.settings.rate) || 1;
+    const starts = st.counts ? chapterStartPages(st.counts) : null;
+    const pos = st.counts ? bookPosition(st.counts, st.index, st.paginator.page) : null;
+    let n = 0;
+    const rows = st.book.chapters.map((c, i) => {
+      const num = c.kind === 'chapter' ? String(++n) : '';
+      return h('li', {}, h('button', {
+        class: `toc-row${i === st.index ? ' current' : ''}`,
         onclick: async () => { s.close(); await openChapter(i); api.emit('manual-turn'); },
-      }, st.lang === 'ru' && c.titleRu ? c.titleRu : c.title))));
-    const s = sheet({ title: st.book.title, body: [list] });
+      },
+      h('span', { class: 'toc-num' }, num),
+      h('span', { class: 'toc-title' }, st.lang === 'ru' && c.titleRu ? c.titleRu : c.title),
+      h('span', { class: 'toc-dur' }, c.audio && c.durationMs ? formatDuration(c.durationMs, rate) : ''),
+      h('span', { class: 'toc-page' }, starts ? String(starts[i]) : '')));
+    });
+    const coverUrl = st.book.cover ? URL.createObjectURL(st.book.cover) : null;
+    const head = h('div', { class: 'toc-head' },
+      coverUrl ? h('img', { class: 'toc-cover', src: coverUrl, alt: '' }) : null,
+      h('div', { class: 'toc-meta' },
+        h('div', { class: 'toc-book' }, st.book.title),
+        h('div', { class: 'toc-where' }, pos ? `Страница ${pos.page} из ${pos.total}`
+          : `Глава ${st.index + 1} из ${st.book.chapters.length}`)),
+      h('button', { class: 'toc-close', 'aria-label': 'Закрыть', onclick: () => s.close() }, icon('close', 20)));
+    const list = h('ol', { class: 'toc' }, rows);
+    const s = sheet({ body: [head, list] });
     s.panel.classList.add('toc-sheet');
+    s.panel.parentNode.classList.add('center');
     const cur = list.querySelector('.current');
     if (cur) cur.scrollIntoView({ block: 'center' });
+    if (coverUrl) setTimeout(() => URL.revokeObjectURL(coverUrl), 60000);
   }
 
   // ---------- жесты ----------
@@ -209,6 +277,10 @@ export function readerScreen() {
     emit(name, detail) { for (const fn of listeners.get(name) || []) fn(detail); },
     openChapter,
     showPage,
+    setNumbering(mode) {
+      st.numbering = mode === 'book' ? 'book' : 'chapter';
+      if (st.paginator) updateFolio();
+    },
     turn,
     relayout,
     setChrome,

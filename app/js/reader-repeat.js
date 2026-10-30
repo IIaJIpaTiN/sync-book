@@ -4,6 +4,7 @@ import { createRepeat } from './repeat.js';
 import { chunkAt, firstChunkOfSentence } from './timeline.js';
 import { h, sheet } from './ui.js';
 import { icon } from './icons.js';
+import { lineSegments, fillSchedule } from './gapline.js';
 
 const realClock = {
   now: () => performance.now(),
@@ -28,16 +29,16 @@ export function attachRepeat(api) {
   el.modeSlot.append(modeSeg);
 
   // ---------- кнопки «Повтора» ----------
-  const prevBtn = h('button', { class: 'bar-btn', 'aria-label': 'Предыдущий отрывок', onclick: () => machine && machine.prev() }, icon('prev'));
-  const playBtn = h('button', { class: 'bar-btn play', 'aria-label': 'Воспроизвести', onclick: () => togglePlay() }, icon('play', 26));
-  const replayBtn = h('button', { class: 'bar-btn', 'aria-label': 'Повторить', onclick: () => machine && machine.replay() }, icon('repeat'));
-  const nextBtn = h('button', { class: 'bar-btn', 'aria-label': 'Следующий отрывок', onclick: () => (machine && machine.state().phase === 'waiting' ? machine.proceed() : machine && machine.next()) }, icon('next'));
+  const prevBtn = h('button', { class: 'bar-btn', 'aria-label': 'Предыдущий отрывок', onclick: () => machine && machine.prev() }, icon('prev', 30));
+  const playBtn = h('button', { class: 'bar-btn play', 'aria-label': 'Воспроизвести', onclick: () => togglePlay() }, icon('play', 34));
+  const replayBtn = h('button', { class: 'bar-btn', 'aria-label': 'Повторить', onclick: () => machine && machine.replay() }, icon('repeat', 30));
+  const nextBtn = h('button', { class: 'bar-btn', 'aria-label': 'Следующий отрывок', onclick: () => (machine && machine.state().phase === 'waiting' ? machine.proceed() : machine && machine.next()) }, icon('next', 30));
   const status = h('div', { class: 'repeat-status', 'aria-live': 'polite' });
   const repeatBar = h('div', { class: 'transport repeat', hidden: true }, prevBtn, playBtn, replayBtn, nextBtn);
-  el.controls.insertBefore(status, el.rateBtn);
-  el.controls.insertBefore(repeatBar, el.rateBtn);
+  el.left.append(status);
+  el.center.append(repeatBar);
   status.hidden = true;
-  const gapBar = h('div', { class: 'gap-bar', hidden: true }, h('div', { class: 'gap-fill' }));
+  const gapBar = h('div', { class: 'gap-lines', hidden: true });
   el.reader.append(gapBar);
 
   function settings() {
@@ -118,7 +119,7 @@ export function attachRepeat(api) {
 
   function refresh(s = machine ? machine.state() : { phase: 'idle' }) {
     const busy = s.phase === 'playing' || s.phase === 'gap' || s.phase === 'waiting';
-    playBtn.replaceChildren(icon(busy ? 'pause' : 'play', 26));
+    playBtn.replaceChildren(icon(busy ? 'pause' : 'play', 34));
     playBtn.setAttribute('aria-label', busy ? 'Остановить' : 'Воспроизвести');
     if (s.phase === 'gap') status.textContent = `Повторите вслух · ${(s.gapMs / 1000).toFixed(1)} с`;
     else if (s.phase === 'waiting') status.textContent = 'Повторите вслух и нажмите «Дальше»';
@@ -147,24 +148,29 @@ export function attachRepeat(api) {
     }
   }
 
-  // Черта под последней строкой отрывка, заполняется за время паузы.
+  // Черты под всеми строками отрывка: заполняются по очереди за время паузы.
   function runGapBar(ms) {
-    const last = marked[marked.length - 1];
-    if (!last) return;
-    const lr = last.getBoundingClientRect();
-    const sameLine = marked.filter((w) => Math.abs(w.getBoundingClientRect().top - lr.top) < 4);
-    const left = Math.min(...sameLine.map((w) => w.getBoundingClientRect().left));
+    if (!marked.length) return;
     const host = el.reader.getBoundingClientRect();
-    Object.assign(gapBar.style, {
-      left: `${left - host.left}px`, top: `${lr.bottom - host.top + 3}px`, width: `${lr.right - left}px`,
+    const vp = el.viewport.getBoundingClientRect();
+    const rects = marked.flatMap((w) => [...w.getClientRects()])
+      .filter((r) => r.right > vp.left && r.left < vp.right);
+    const plan = fillSchedule(lineSegments(rects), ms);
+    const fills = plan.map((seg) => {
+      const fill = h('div', { class: 'gap-fill' });
+      const bar = h('div', { class: 'gap-bar' }, fill);
+      Object.assign(bar.style, {
+        left: `${seg.left - host.left}px`, top: `${seg.bottom - host.top + 3}px`, width: `${seg.right - seg.left}px`,
+      });
+      return { fill, seg };
     });
-    const fill = gapBar.firstChild;
-    fill.style.transition = 'none';
-    fill.style.transform = 'scaleX(0)';
+    gapBar.replaceChildren(...fills.map((f) => f.fill.parentNode));
     gapBar.hidden = false;
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      fill.style.transition = `transform ${ms}ms linear`;
-      fill.style.transform = 'scaleX(1)';
+      for (const { fill, seg } of fills) {
+        fill.style.transition = `transform ${seg.duration}ms linear ${seg.delay}ms`;
+        fill.style.transform = 'scaleX(1)';
+      }
     }));
   }
 

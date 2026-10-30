@@ -4,7 +4,7 @@ import { h } from './ui.js';
 
 export const SIZES = [14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 32];
 export const LEADING = { tight: 1.45, normal: 1.6, loose: 1.8 };
-export const MARGINS = { narrow: 24, normal: 48, wide: 80 };
+export const MARGINS = { narrow: 0.04, normal: 0.07, wide: 0.11 }; // доля ширины экрана
 export const FONTS = {
   iowan: '"Iowan Old Style", "Palatino Linotype", Palatino, serif',
   charter: 'Charter, "Bitstream Charter", serif',
@@ -19,6 +19,7 @@ const THEME_NAMES = { paper: 'Бумага', sepia: 'Сепия', gray: 'Сер�
 export const DEFAULTS = {
   theme: 'sepia', font: 'iowan', sizeStep: 4, leading: 'normal', margins: 'normal', align: 'justify',
   hyphens: true, rate: 1.0, highlight: 'both', repeatMode: 'auto', gapFactor: 1.5, repeats: 1, pauseOnTranslate: true,
+  pageNumbering: 'chapter',
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -41,6 +42,7 @@ export function normalize(input) {
     gapFactor: Math.round(clamp(num(s.gapFactor, 1.5), 1, 3) * 10) / 10,
     repeats: Math.round(clamp(num(s.repeats, 1), 1, 3)),
     pauseOnTranslate: Boolean(s.pauseOnTranslate),
+    pageNumbering: pick(s.pageNumbering, ['chapter', 'book'], DEFAULTS.pageNumbering),
   };
 }
 
@@ -49,7 +51,7 @@ export function toCssVars(s) {
     '--book-size': `${SIZES[s.sizeStep]}px`,
     '--book-font': FONTS[s.font],
     '--book-leading': String(LEADING[s.leading]),
-    '--page-margin': `${MARGINS[s.margins]}px`,
+    '--page-margin': String(MARGINS[s.margins]),
     '--book-align': s.align,
     '--book-hyphens': s.hyphens ? 'auto' : 'manual',
   };
@@ -125,6 +127,7 @@ export function attachSettings(api) {
       if (s.rate !== before.rate) api.setRate(s.rate);
       if (pc.hl && s.highlight !== before.highlight && !api.repeatActive) pc.hl.setMode(s.highlight);
     }
+    if (s.pageNumbering !== before.pageNumbering) api.setNumbering(s.pageNumbering);
     const layoutKeys = ['sizeStep', 'font', 'leading', 'margins', 'align', 'hyphens'];
     if (layoutKeys.some((k) => s[k] !== before[k])) {
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
@@ -166,6 +169,7 @@ export function attachSettings(api) {
       row('Поля', seg([['narrow', 'Узкие'], ['normal', 'Обычные'], ['wide', 'Широкие']], s.margins, (v) => update({ margins: v }))),
       row('Выравнивание', seg([['justify', 'По ширине'], ['left', 'Влево']], s.align, (v) => update({ align: v }))),
       row('Переносы', toggle(s.hyphens, (v) => update({ hyphens: v }))),
+      row('Нумерация страниц', seg([['chapter', 'Глава'], ['book', 'Книга']], s.pageNumbering, (v) => update({ pageNumbering: v }))),
       h('h4', { class: 'set-section' }, 'Звук'),
       rate,
       row('Подсветка', seg([['both', 'Всё'], ['sentence', 'Фраза'], ['word', 'Слово'], ['off', 'Нет']], s.highlight, (v) => update({ highlight: v }))),
@@ -183,10 +187,12 @@ export function attachSettings(api) {
 
   api.on('settings', () => open());
   api.on('rate-click', () => open(true));
+  api.on('numbering-toggle', () => update({ pageNumbering: s.pageNumbering === 'book' ? 'chapter' : 'book' }));
   api.on('unmount', close);
   api.on('ready', async () => {
     s = normalize(await getSettings());
     apply(s);
+    api.setNumbering(s.pageNumbering);
     if (api.player) {
       Object.assign(api.player.settings, s);
       api.setRate(s.rate);
