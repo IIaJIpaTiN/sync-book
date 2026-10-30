@@ -4,7 +4,7 @@
 
 export const SHADE = 0.16;
 // Сняты с записи Apple Books: половина пути за ~120–220 мс, 90 % за ~350–550 мс, видимое движение ~600 мс.
-const BASE_MS = 680;
+const BASE_MS = 600;
 const MIN_MS = 120;
 const EASE = 'cubic-bezier(.25, .46, .45, .94)';
 
@@ -32,23 +32,14 @@ export function finishDuration(fromP, toP, base = BASE_MS) {
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Карточка страницы: копия содержимого главы, сдвинутая на нужную страницу.
-export function pageCard(contentClone, offsetX) {
-  const card = document.createElement('div');
-  card.className = 'page-card';
-  contentClone.style.transition = 'none';
-  contentClone.style.transform = `translateX(${offsetX}px)`;
-  card.append(contentClone);
-  return card;
-}
-
-// Слои анимации поверх настоящего содержимого: [under] → тень → карточка.
-export function createSlide({ viewport, card, under = null, dir }) {
-  const width = viewport.clientWidth;
+// Слои анимации поверх экрана чтения (host): [under] → тень → карточка.
+// Карточка — снимок всего экрана страницы: колонтитул, текст и номер страницы.
+export function createSlide({ host, card, under = null, dir }) {
+  const width = host.clientWidth;
   const shade = document.createElement('div');
   shade.className = 'page-shade';
-  if (under && !under.isConnected) viewport.append(under);
-  viewport.append(shade, card);
+  if (under && !under.isConnected) host.append(under);
+  host.append(shade, card);
   let p = 0;
 
   function apply(np, ms) {

@@ -3,7 +3,7 @@ import { getBook, getChapter, getProgress, putProgress } from './store.js';
 import { renderEn, renderRu } from './render.js';
 import { Paginator, autoSpread, anchorPageAfterRelayout } from './paginator.js';
 import { classifyTap } from './taps.js';
-import { createSlide, dragProgress, pageCard, shouldComplete } from './pageturn.js';
+import { createSlide, dragProgress, shouldComplete } from './pageturn.js';
 import { go } from './main.js';
 import { h, sheet } from './ui.js';
 import { icon } from './icons.js';
@@ -100,6 +100,10 @@ export function readerScreen() {
 
   function showPage(page) {
     st.paginator.goTo(page);
+    afterPageChange();
+  }
+
+  function afterPageChange() {
     st.anchor = firstVisibleSentence();
     updateFolio();
     saveProgress();
@@ -171,10 +175,28 @@ export function readerScreen() {
     return clone;
   }
 
-  // Карточка страницы для анимации. Копия главы делается один раз и переиспользуется.
+  // Карточка — снимок всего экрана страницы: колонтитул, текст и номер страницы, как в Books.
+  function screenCard(page, content) {
+    const card = document.createElement('div');
+    card.className = 'page-card';
+    const head = el.runhead.cloneNode(true);
+    const foot = el.folio.cloneNode(true);
+    foot.textContent = folioText({
+      mode: st.numbering, page, pages: st.paginator.pages, counts: st.counts, index: st.index,
+    });
+    const vp = document.createElement('div');
+    vp.className = 'viewport';
+    content.style.transition = 'none';
+    content.style.transform = `translateX(${-page * st.paginator.step}px)`;
+    vp.append(content);
+    card.append(head, vp, foot);
+    return card;
+  }
+
+  // Копия главы для карточек делается один раз и переиспользуется.
   function makeCard(page) {
     if (!st.cardClone) st.cardClone = cloneContent();
-    return pageCard(st.cardClone, -page * st.paginator.step);
+    return screenCard(page, st.cardClone);
   }
 
   function canTurnInChapter(dir) {
@@ -188,8 +210,11 @@ export function readerScreen() {
     const from = p.page;
     const to = from + dir;
     const card = makeCard(dir > 0 ? from : to);
-    if (dir > 0) p.goTo(to); // под уезжающей карточкой уже лежит следующая страница
-    const slide = createSlide({ viewport: el.viewport, card, dir });
+    if (dir > 0) {
+      p.goTo(to); // под уезжающей карточкой уже лежит следующая страница
+      updateFolio();
+    }
+    const slide = createSlide({ host: el.reader, card, dir });
     st.turning = true;
     return {
       slide,
@@ -200,7 +225,7 @@ export function readerScreen() {
         showPage(to);
       },
       cancel() {
-        if (dir > 0) p.goTo(from);
+        if (dir > 0) { p.goTo(from); updateFolio(); }
         slide.remove();
         st.turning = false;
       },
@@ -212,17 +237,17 @@ export function readerScreen() {
     try {
       if (dir > 0) {
         const card = makeCard(st.paginator.page);
-        const slide = createSlide({ viewport: el.viewport, card, dir: 1 });
+        const slide = createSlide({ host: el.reader, card, dir: 1 });
         await openChapter(st.index + 1);
         await slide.run(1);
         slide.remove();
       } else {
         // текущая страница остаётся неподвижной под наезжающей предыдущей главой
-        const under = pageCard(cloneContent(), -st.paginator.page * st.paginator.step);
+        const under = screenCard(st.paginator.page, cloneContent());
         under.classList.add('under');
-        el.viewport.append(under);
+        el.reader.append(under);
         await openChapter(st.index - 1, { toEnd: true });
-        const slide = createSlide({ viewport: el.viewport, card: makeCard(st.paginator.page), under, dir: -1 });
+        const slide = createSlide({ host: el.reader, card: makeCard(st.paginator.page), under, dir: -1 });
         await slide.run(1);
         slide.remove();
       }
@@ -231,8 +256,10 @@ export function readerScreen() {
     }
   }
 
+  // Ручное перелистывание (тап, клавиши) — карточкой; панели при этом прячутся, как в Books.
   async function turn(dir) {
     if (st.loading || st.turning) return; // второй тап не должен перескочить через страницу
+    setChrome(false);
     if (canTurnInChapter(dir)) {
       const t = beginPageSlide(dir);
       await t.slide.run(1);
@@ -243,14 +270,12 @@ export function readerScreen() {
     api.emit('manual-turn');
   }
 
-  // Переход к странице чтеца: соседняя — с анимацией, дальняя — сразу.
-  async function goPage(page) {
+  // Переход вслед за чтецом — простым сдвигом ленты, без карточки.
+  function goPage(page) {
     if (st.turning || st.loading || page === st.paginator.page) return;
-    const dir = page - st.paginator.page;
-    if (Math.abs(dir) === 1) {
-      const t = beginPageSlide(dir);
-      await t.slide.run(1);
-      t.commit();
+    if (Math.abs(page - st.paginator.page) === 1) {
+      st.paginator.goTo(page, { animate: true });
+      afterPageChange();
     } else {
       showPage(page);
     }
@@ -349,6 +374,7 @@ export function readerScreen() {
           drag = false; // на границе главы — обычный свайп по отпусканию
           return;
         }
+        setChrome(false);
         drag = { dir, turn: beginPageSlide(dir), lastX: e.clientX, lastT: e.timeStamp, v: 0 };
         api.emit('drag-start');
       }
