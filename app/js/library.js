@@ -46,7 +46,7 @@ export function libraryScreen() {
       cover = h('div', { class: 'cover cover-plain' }, h('span', {}, book.title));
     }
     const el = h('button', { class: 'book', 'aria-label': book.title },
-      h('div', { class: 'cover-wrap' }, cover),
+      h('div', { class: 'cover-wrap' }, h('div', { class: 'cover-frame' }, cover)),
       h('div', { class: 'book-title' }, book.title),
       h('div', { class: 'book-meta' }, complete ? (p ? `${percent} %` : 'Новая') : 'Нужен повторный импорт'));
     let timer = null;
