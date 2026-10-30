@@ -232,6 +232,17 @@ export function readerScreen() {
 
   // ---------- жесты ----------
   function bindGestures() {
+    // Полосы над и под текстом (колонтитулы) — тап показывает панели; тап по пустому месту
+    // панели — прячет. Так меню открывается, не задевая слова и зоны листания.
+    el.reader.addEventListener('click', (e) => {
+      const t = e.target;
+      if (t === el.reader || t === el.runhead || t === el.folio) {
+        if (api.cardOpen && api.cardOpen()) api.emit('close-card');
+        else setChrome(!st.chrome);
+      } else if (t === el.top || t === el.bottom || t === el.left || t === el.center || t === el.right) {
+        setChrome(false);
+      }
+    });
     let start = null;
     el.viewport.addEventListener('pointerdown', (e) => {
       start = { x: e.clientX, y: e.clientY, t: Date.now(), target: e.target };

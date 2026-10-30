@@ -1,5 +1,6 @@
 /* Экран чтения: страница — главное, панели появляются поверх по тапу в центр. */
 .reader {
+  --bar-h: 60px; /* высота панелей без системных отступов; текст начинается и кончается за ними */
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -9,8 +10,8 @@
   position: absolute;
   left: env(safe-area-inset-left);
   right: env(safe-area-inset-right);
-  top: calc(56px + env(safe-area-inset-top));
-  bottom: calc(52px + env(safe-area-inset-bottom));
+  top: calc(var(--bar-h) + env(safe-area-inset-top));
+  bottom: calc(var(--bar-h) + env(safe-area-inset-bottom));
   overflow: hidden;
   touch-action: pan-y;
   user-select: none;
@@ -74,8 +75,9 @@
   text-overflow: ellipsis;
   padding: 0 80px;
 }
-.runhead { top: calc(22px + env(safe-area-inset-top)); }
-.folio { bottom: calc(18px + env(safe-area-inset-bottom)); }
+.runhead, .folio { line-height: 16px; }
+.runhead { top: calc(env(safe-area-inset-top) + (var(--bar-h) - 16px) / 2); }
+.folio { bottom: calc(env(safe-area-inset-bottom) + (var(--bar-h) - 16px) / 2); }
 
 /* панели */
 .bar {
@@ -95,13 +97,13 @@
 }
 .bar.top {
   top: 0;
-  height: calc(56px + env(safe-area-inset-top));
+  height: calc(var(--bar-h) + env(safe-area-inset-top));
   padding-top: env(safe-area-inset-top);
   border-bottom: .5px solid var(--line);
 }
 .bar.bottom {
   bottom: 0;
-  min-height: calc(60px + env(safe-area-inset-bottom));
+  height: calc(var(--bar-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   border-top: .5px solid var(--line);
 }
@@ -157,7 +159,8 @@
 .bar.bottom {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  min-height: calc(76px + env(safe-area-inset-bottom));
+  grid-template-rows: var(--bar-h);
+  align-items: center;
 }
 .bar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .bar-center { display: flex; align-items: center; justify-content: center; }
@@ -248,8 +251,8 @@
 /* плеер */
 .mode-slot { display: flex; align-items: center; }
 .transport { display: flex; align-items: center; gap: 18px; }
-.transport .bar-btn { width: 52px; height: 52px; }
-.transport .play { width: 64px; height: 64px; color: var(--accent); }
+.transport .bar-btn { width: 48px; height: 48px; }
+.transport .play { width: 56px; height: 56px; color: var(--accent); }
 .chip {
   padding: 5px 10px;
   border-radius: 8px;
@@ -263,7 +266,7 @@
   position: absolute;
   z-index: 9;
   left: 50%;
-  bottom: calc(92px + env(safe-area-inset-bottom));
+  bottom: calc(var(--bar-h) + 16px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   padding: 9px 18px;
   border-radius: 999px;

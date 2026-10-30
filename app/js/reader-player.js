@@ -4,6 +4,7 @@ import { Player } from './player.js';
 import { build, nextAudioChapter, sentenceIndexById, wordAt } from './timeline.js';
 import { Highlighter } from './sync.js';
 import { relayoutTarget } from './paginator.js';
+import { ruFor } from './bilingual.js';
 import { audioFile, audioName, putProgress } from './store.js';
 import { h, sheet } from './ui.js';
 import { icon } from './icons.js';
@@ -68,9 +69,9 @@ export function attachPlayer(api) {
     if (player.playing) { player.pause(); return; }
     api.emit('play-request');
     if (api.playOverride && (await api.playOverride())) return;
-    // если пользователь ушёл листать — начинаем с первого предложения на странице
-    if (!ctx.follow || !currentWordVisible()) await seekToSentenceEl(firstSentenceOnPage());
-    ctx.follow = true;
+    // продолжаем с места чтеца: если пользователь ушёл листать, возвращаем страницу к нему
+    // (начать с другого места — долгое нажатие на слово → «Читать отсюда»)
+    showReader();
     await player.play();
   }
 
@@ -79,10 +80,6 @@ export function attachPlayer(api) {
     await player.seek(Math.max(0, Math.min(player.ms + delta, player.durationMs - 100)));
     ctx.follow = true;
     onTick(player.ms);
-  }
-
-  function firstSentenceOnPage() {
-    return st.anchor;
   }
 
   async function seekToSentenceEl(sEl) {
@@ -102,8 +99,48 @@ export function attachPlayer(api) {
     return Boolean(w && st.paginator && st.paginator.isVisible(w));
   }
 
+  // Элемент на экране, соответствующий месту чтеца: слово в английском тексте или
+  // соответствующая фраза русского издания.
+  function readerEl() {
+    if (st.lang === 'en') return (ctx.hl && ctx.hl.wordEl) || null;
+    if (!ctx.tl || !st.data.ru) return null;
+    const w = wordAt(ctx.tl, player.ms);
+    if (w < 0) return null;
+    const enId = ctx.tl.sentences[ctx.tl.wSent[w]].id;
+    if (enId !== ctx.ruEnId) {
+      ctx.ruEnId = enId;
+      const rid = ruFor(enId, st.data.ru.align);
+      ctx.ruEl = rid == null ? null : el.content.querySelector(`[data-rs="${rid}"]`);
+    }
+    return ctx.ruEl;
+  }
+
+  function readerVisible() {
+    const r = readerEl();
+    return Boolean(r && st.paginator && st.paginator.isVisible(r));
+  }
+
+  function showReader() {
+    const r = readerEl();
+    if (r && !st.paginator.isVisible(r)) api.showPage(st.paginator.pageOf(r));
+    ctx.follow = true;
+    el.toReader.hidden = true;
+  }
+
+  // Место чтеца в русском тексте: страницы следуют за ним, «К чтецу» возвращает к нему.
+  function onTickRu() {
+    const r = readerEl();
+    if (!r) { el.toReader.hidden = true; return; }
+    const visible = st.paginator.isVisible(r);
+    if (visible) ctx.follow = true;
+    if (!visible && ctx.follow && player.playing) api.showPage(st.paginator.pageOf(r));
+    el.toReader.hidden = ctx.follow || !player.playing;
+  }
+
   function onTick(ms) {
-    if (!ctx.hl || st.lang !== 'en' || api.repeatActive) return;
+    if (api.repeatActive) return;
+    if (st.lang !== 'en') { if (ctx.tl) onTickRu(); updateRemaining(ms); return; }
+    if (!ctx.hl) return;
     const { wordEl, sentence } = ctx.hl.update(ms);
     if (wordEl) {
       const visible = st.paginator.isVisible(wordEl);
@@ -134,16 +171,13 @@ export function attachPlayer(api) {
     el.remaining.textContent = ` · осталось ${min < 1 ? 'меньше минуты' : `${min} мин`}`;
   }
 
-  async function backToReader() {
-    ctx.follow = true;
-    const w = ctx.hl && ctx.hl.wordEl;
-    if (w) api.showPage(st.paginator.pageOf(w));
-    el.toReader.hidden = true;
+  function backToReader() {
+    showReader();
   }
 
   api.on('manual-turn', () => {
     if (!player.playing) return;
-    ctx.follow = currentWordVisible();
+    ctx.follow = readerVisible();
     el.toReader.hidden = ctx.follow;
   });
 
@@ -160,6 +194,7 @@ export function attachPlayer(api) {
     if (ctx.hl) ctx.hl.clear();
     ctx.tl = build(st.data.en);
     ctx.hl = st.lang === 'en' ? new Highlighter(el.content, ctx.tl, ctx.settings.highlight) : null;
+    ctx.ruEnId = null; // место чтеца в русском тексте ищется заново
     const file = meta.audio ? await audioFile(st.book.id, audioName(meta.audio)) : null;
     if (gen !== ctx.chapterGen) return; // пока читали файл, открыли другую главу
     ctx.hasAudio = Boolean(file);
@@ -200,8 +235,8 @@ export function attachPlayer(api) {
     onTick(player.ms);
     const w = ctx.hl && ctx.hl.wordEl;
     if (jumpToReader && w && !st.paginator.isVisible(w)) api.showPage(st.paginator.pageOf(w), false);
-    ctx.follow = currentWordVisible();
-    el.toReader.hidden = ctx.follow || !wasPlaying || st.lang !== 'en';
+    ctx.follow = readerVisible();
+    el.toReader.hidden = ctx.follow || !wasPlaying;
     setMediaMeta(meta);
     if (wasPlaying) await player.play();
     api.emit('audio-ready');
