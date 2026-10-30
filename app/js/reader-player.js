@@ -122,7 +122,7 @@ export function attachPlayer(api) {
 
   function showReader() {
     const r = readerEl();
-    if (r && !st.paginator.isVisible(r)) api.showPage(st.paginator.pageOf(r));
+    if (r && !st.paginator.isVisible(r)) api.goPage(st.paginator.pageOf(r));
     ctx.follow = true;
     el.toReader.hidden = true;
   }
@@ -133,7 +133,7 @@ export function attachPlayer(api) {
     if (!r) { el.toReader.hidden = true; return; }
     const visible = st.paginator.isVisible(r);
     if (visible) ctx.follow = true;
-    if (!visible && ctx.follow && player.playing) api.showPage(st.paginator.pageOf(r));
+    if (!visible && ctx.follow && player.playing) api.goPage(st.paginator.pageOf(r));
     el.toReader.hidden = ctx.follow || !player.playing;
   }
 
@@ -146,7 +146,7 @@ export function attachPlayer(api) {
       const visible = st.paginator.isVisible(wordEl);
       if (visible) ctx.follow = true;
       if (!visible && ctx.follow && player.playing) {
-        api.showPage(st.paginator.pageOf(wordEl));
+        api.goPage(st.paginator.pageOf(wordEl));
       }
       el.toReader.hidden = ctx.follow || !player.playing;
     }
@@ -325,6 +325,7 @@ export function attachPlayer(api) {
       wordMenu(word);
     }, LONG_PRESS_MS);
   });
+  api.on('drag-start', () => clearTimeout(ctx.longPress));
   api.consumeTap = (s) => {
     clearTimeout(ctx.longPress);
     if (ctx.longFired) { ctx.longFired = false; return true; }

@@ -327,3 +327,25 @@
   100% { background: transparent; box-shadow: 0 0 0 2px transparent; }
 }
 .gap-lines { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+
+/* перелистывание «Сдвиг»: страница-карточка с тенью поверх притенённой следующей */
+.page-card {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  background: var(--bg);
+  pointer-events: none;
+  border-radius: 0 12px 12px 0;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, .10), 8px 0 28px rgba(0, 0, 0, .16);
+  will-change: transform;
+}
+.page-card.under { z-index: 1; border-radius: 0; box-shadow: none; }
+.page-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}

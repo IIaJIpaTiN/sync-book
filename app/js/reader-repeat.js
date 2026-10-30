@@ -144,7 +144,7 @@ export function attachRepeat(api) {
       marked[0].classList.add('c-first');
       marked[marked.length - 1].classList.add('c-last');
       const first = marked[0];
-      if (!st.paginator.isVisible(first)) api.showPage(st.paginator.pageOf(first));
+      if (!st.paginator.isVisible(first)) api.goPage(st.paginator.pageOf(first));
     }
   }
 
