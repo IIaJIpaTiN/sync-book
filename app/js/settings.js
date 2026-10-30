@@ -1,6 +1,7 @@
 // Настройки чтения: значения по умолчанию, нормализация, CSS-переменные и панель «Аа».
 import { getSettings, putSettings } from './store.js';
 import { h } from './ui.js';
+import { APP_VERSION } from './version.js';
 
 export const SIZES = [14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 32];
 export const LEADING = { tight: 1.45, normal: 1.6, loose: 1.8 };
@@ -179,7 +180,8 @@ export function attachSettings(api) {
         min: 1, max: 3, step: 0.1, value: s.gapFactor, format: (v) => `×${v.toFixed(1)}`, onInput: (v) => update({ gapFactor: v }),
       })),
       row('Повторов', seg([[1, '1'], [2, '2'], [3, '3']], s.repeats, (v) => update({ repeats: v }))),
-      row('Пауза при переводе', toggle(s.pauseOnTranslate, (v) => update({ pauseOnTranslate: v }))));
+      row('Пауза при переводе', toggle(s.pauseOnTranslate, (v) => update({ pauseOnTranslate: v }))),
+      h('div', { class: 'set-version' }, `Версия ${APP_VERSION}`));
     el.reader.append(panel);
     document.addEventListener('pointerdown', outside, true);
     if (focusRate) rate.scrollIntoView({ block: 'center' });

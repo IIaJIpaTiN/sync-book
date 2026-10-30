@@ -188,3 +188,4 @@
 }
 .switch.on { background: var(--accent); }
 .switch.on::after { transform: translateX(18px); }
+.set-version { margin-top: 16px; text-align: center; font-size: 12px; color: var(--muted); }

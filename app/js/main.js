@@ -31,7 +31,21 @@ async function route() {
 
 async function start() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW:', err));
+    // Новая версия: как только её Service Worker взял управление, перезагрузиться один раз,
+    // чтобы не работать со старым кодом до следующего запуска.
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // при возврате в приложение из фона — проверить, нет ли новой версии
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    }).catch((err) => console.warn('SW:', err));
   }
   const { loadSettings, attachSettings } = await import('./settings.js');
   await loadSettings();

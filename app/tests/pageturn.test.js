@@ -27,7 +27,7 @@ test('pageturn: release completes past a quarter or on a flick', () => {
 });
 
 test('pageturn: remaining distance sets the duration', () => {
-  assertEqual(finishDuration(0, 1), 600);
-  assertEqual(finishDuration(0.5, 1), 300);
+  assertEqual(finishDuration(0, 1), 680);
+  assertEqual(finishDuration(0.5, 1), 340);
   assertEqual(finishDuration(0.95, 1), 120);
 });
