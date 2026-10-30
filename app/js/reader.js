@@ -334,9 +334,8 @@ export function readerScreen() {
           : `Глава ${st.index + 1} из ${st.book.chapters.length}`)),
       h('button', { class: 'toc-close', 'aria-label': 'Закрыть', onclick: () => s.close() }, icon('close', 20)));
     const list = h('ol', { class: 'toc' }, rows);
-    const s = sheet({ body: [head, list] });
+    const s = sheet({ body: [head, list], kind: 'page' });
     s.panel.classList.add('toc-sheet');
-    s.panel.parentNode.classList.add('center');
     const cur = list.querySelector('.current');
     if (cur) cur.scrollIntoView({ block: 'center' });
     if (coverUrl) setTimeout(() => URL.revokeObjectURL(coverUrl), 60000);

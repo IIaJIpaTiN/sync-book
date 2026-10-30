@@ -189,3 +189,32 @@
 .switch.on { background: var(--accent); }
 .switch.on::after { transform: translateX(18px); }
 .set-version { margin-top: 16px; text-align: center; font-size: 12px; color: var(--muted); }
+
+/* большой лист снизу (оглавление): выезжает снизу с мягкой остановкой, уезжает вниз */
+.backdrop.page-sheet {
+  align-items: flex-end;
+  padding: 0;
+  transition: background 500ms ease;
+}
+.backdrop.page-sheet.open { background: rgba(0, 0, 0, .18); }
+.backdrop.page-sheet.closing { transition: background 400ms ease; }
+.sheet.page {
+  width: min(920px, 78vw);
+  height: calc(100% - max(28px, env(safe-area-inset-top) + 20px));
+  max-height: none;
+  border-radius: 22px 22px 0 0;
+  opacity: 1;
+  transform: translateY(100%);
+  transition: transform 500ms cubic-bezier(.32, .72, 0, 1);
+}
+@media (orientation: portrait) {
+  .sheet.page { width: calc(100% - 16px); }
+}
+.backdrop.page-sheet.open .sheet.page { transform: none; }
+.backdrop.page-sheet.closing .sheet.page {
+  transform: translateY(100%);
+  transition: transform 400ms cubic-bezier(.45, 0, .2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet.page, .backdrop.page-sheet.closing .sheet.page { transition: none; }
+}
